@@ -2,7 +2,8 @@ import torch
 import torch.nn as nn
 from transformers import AutoTokenizer, AutoModel, BitsAndBytesConfig
 from sentence_transformers import SentenceTransformer
-from config import MODEL_CONFIGS
+from config import MODEL_CONFIGS, VERBOSE
+import logging
 import time
 
 class EmbeddingGenerator(nn.Module):
@@ -10,6 +11,7 @@ class EmbeddingGenerator(nn.Module):
     
     def __init__(self, model_name, embedding_size, quantize=False):
         super().__init__()
+        logger = logging.getLogger(__name__)
         self.model_name = model_name
         self.embedding_size = embedding_size
         self.device = "cuda"
@@ -23,7 +25,7 @@ class EmbeddingGenerator(nn.Module):
             )
             if self.tokenizer.pad_token is None:
                 self.tokenizer.pad_token = self.tokenizer.eos_token
-                print(f"Set pad_token to eos_token: {self.tokenizer.pad_token}")
+                logger.info(f"Set pad_token to eos_token: {self.tokenizer.pad_token}")
             
             quantization_config = BitsAndBytesConfig(
                 load_in_4bit=True,
@@ -56,6 +58,7 @@ class EmbeddingGenerator(nn.Module):
     
     def generate_embedding(self, texts):
         """Generate embeddings for a list of texts with timing."""
+        logger = logging.getLogger(__name__)
         timings = {"query_preprocessing": 0.0, "query_encoding": 0.0}
 
         # Ensure input is a list
@@ -69,6 +72,7 @@ class EmbeddingGenerator(nn.Module):
                 inputs = self.tokenizer(texts, return_tensors="pt", padding=True, truncation=True).to(self.device)
                 preprocess_duration = time.time() - start_time
                 timings["query_preprocessing"] = preprocess_duration
+                logger.debug(f"Query Preprocessing Duration: {preprocess_duration:.4f}s")
 
                 # Time encoding
                 start_time = time.time()
@@ -82,20 +86,22 @@ class EmbeddingGenerator(nn.Module):
                 embeddings = self.projection(embeddings)
                 encoding_duration = time.time() - start_time
                 timings["query_encoding"] = encoding_duration
+                logger.debug(f"Query Encoding Duration: {encoding_duration:.4f}s")
 
                 embeddings = embeddings.cpu().tolist()  # always return list of vectors    
                 return embeddings, timings
 
             except Exception as e:
-                print(f"Error generating embedding: {e}")
+                logger.error(f"Error generating embedding: {e}")
                 raise
 
         else:
             # Time encoding (includes preprocessing)
             start_time = time.time()
-            embedding = self.model.encode(texts, convert_to_tensor=True, batch_size=32)
+            embedding = self.model.encode(texts, convert_to_tensor=True, batch_size=1)  # Sequential processing
             encoding_duration = time.time() - start_time
             timings["query_encoding"] = encoding_duration
+            logger.debug(f"Query Encoding Duration: {encoding_duration:.4f}s")
 
             if embedding.dim() == 1:
                 embedding = embedding.unsqueeze(0)
@@ -107,6 +113,6 @@ class EmbeddingGenerator(nn.Module):
                     embedding = embedding.to(dtype=self.projection.weight.dtype)
                 embedding = self.projection(embedding)
 
-            embedding = embedding.cpu().tolist()
+            embeddings = embedding.cpu().tolist()
 
-            return embedding, timings  # always return list of vectors
+            return embeddings, timings  # always return list of vectors

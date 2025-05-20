@@ -3,15 +3,12 @@ from pymongo.errors import ServerSelectionTimeoutError, ConnectionFailure
 import time
 import logging
 import os
-from config import DB_URI, DB_NAME, COLLECTION_NAME
+from config import DB_URI, DB_NAME, COLLECTION_NAME, VERBOSE
 
-# Configure logging
-logging.basicConfig(level=logging.INFO, format="%(asctime)s - %(levelname)s - %(message)s")
 logger = logging.getLogger(__name__)
 
 def get_db_connection(max_retries=5, retry_delay=5, server_timeout_ms=60000):
     """Establish and return a MongoDB collection connection with retries."""
-    # Allow DB_URI override via environment variable
     db_uri = os.getenv("MONGO_DB_URI", DB_URI)
     
     for attempt in range(max_retries):
@@ -23,7 +20,6 @@ def get_db_connection(max_retries=5, retry_delay=5, server_timeout_ms=60000):
                 connectTimeoutMS=60000,
                 socketTimeoutMS=60000
             )
-            # Ping the server to verify connection
             client.admin.command('ping')
             logger.info("Connected to MongoDB successfully!")
             db = client[DB_NAME]
@@ -53,14 +49,19 @@ def get_db_connection(max_retries=5, retry_delay=5, server_timeout_ms=60000):
 
 def setup_vector_index(collection, embedding_size, timeout=300, max_interval=5):
     """Create or update the vector index for the collection."""
+    logger = logging.getLogger(__name__)
     try:
         start_time = time.time()
         indexes = list(collection.list_search_indexes())
+        drop_duration = 0.0
         for index in indexes:
             if index["name"] == "vector_index":
+                drop_start = time.time()
                 collection.drop_search_index(index["name"])
-                logger.info("Existing 'vector_index' dropped.")
+                drop_duration = time.time() - drop_start
+                logger.info(f"Existing 'vector_index' dropped in {drop_duration:.2f}s")
 
+        create_start = time.time()
         collection.create_search_index({
             "name": "vector_index",
             "definition": {
@@ -76,17 +77,21 @@ def setup_vector_index(collection, embedding_size, timeout=300, max_interval=5):
                 }
             }
         })
+        create_duration = time.time() - create_start
+        logger.info(f"Vector index created in {create_duration:.2f}s")
 
         logger.info("Waiting for vector index to be ready...")
         interval = 0.5
         attempt = 0
+        wait_start = time.time()
         while time.time() - start_time < timeout:
             indexes = list(collection.list_search_indexes())
             vector_index = next((idx for idx in indexes if idx["name"] == "vector_index"), None)
             if vector_index and vector_index.get("status") == "READY":
-                logger.info("Vector index is now ready!")
+                wait_duration = time.time() - wait_start
+                logger.info(f"Vector index is now ready in {wait_duration:.2f}s")
                 indexing_duration = time.time() - start_time
-                logger.info(f"Document Indexing Duration: {indexing_duration:.2f}s")
+                logger.info(f"Total Document Indexing Duration: {indexing_duration:.2f}s (Drop: {drop_duration:.2f}s, Create: {create_duration:.2f}s, Wait: {wait_duration:.2f}s)")
                 return indexing_duration
             sleep_time = min(interval * (1.5 ** attempt), max_interval)
             time.sleep(sleep_time)

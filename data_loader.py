@@ -1,5 +1,5 @@
 from datasets import load_dataset, concatenate_datasets
-from config import DATASET_NAME, SUBSET_NAME
+from config import DATASET_NAME, SUBSET_NAME, VERBOSE
 from db_utils import get_db_connection, setup_vector_index
 from system_evaluation import SystemEvaluator
 from tqdm import tqdm
@@ -10,6 +10,7 @@ import time
 
 def compute_doc_stats(dataset):
     """Compute document count and size in MB for a dataset."""
+    logger = logging.getLogger(__name__)
     doc_count = 0
     total_bytes = 0
     for entry in dataset:
@@ -18,9 +19,8 @@ def compute_doc_stats(dataset):
         total_bytes += sum(len(doc.encode("utf-8")) for doc in documents)
     return doc_count, total_bytes / (1024 * 1024)
 
-def load_and_store_data(limit=None, embedding_generator=None, embedding_size=None, use_batch=False):
-    """Load hotpotqa and pubmedqa test splits, store in MongoDB with embeddings."""
-    logging.basicConfig(level=logging.INFO, format="%(asctime)s - %(levelname)s - %(message)s")
+def load_and_store_data(limit=None, embedding_generator=None, embedding_size=None):
+    """Load hotpotqa and pubmedqa test splits, store in MongoDB with embeddings sequentially."""
     logger = logging.getLogger(__name__)
     
     evaluator = SystemEvaluator()
@@ -39,8 +39,9 @@ def load_and_store_data(limit=None, embedding_generator=None, embedding_size=Non
     timings["dataset_load"] = time.time() - start_time
     logger.info(f"Dataset Loading Duration: {timings['dataset_load']:.2f}s")
     
-    logger.debug(f"Sample HotpotQA Entry: {hotpotqa_dataset[0]}")
-    logger.debug(f"Sample PubMedQA Entry: {pubmedqa_dataset[0]}")
+    if VERBOSE:
+        logger.debug(f"Sample HotpotQA Entry: {hotpotqa_dataset[0]}")
+        logger.debug(f"Sample PubMedQA Entry: {pubmedqa_dataset[0]}")
     
     evaluator.start_monitoring()
     
@@ -59,7 +60,7 @@ def load_and_store_data(limit=None, embedding_generator=None, embedding_size=Non
     stats["hotpotqa_size_mb"] = hotpotqa_mb
     stats["pubmedqa_size_mb"] = pubmedqa_mb
     stats["total_size_mb"] = total_mb
-    stats["embedding_mode"] = "batch" if use_batch else "sequential"
+    stats["embedding_mode"] = "sequential"
     
     logger.info(f"HotpotQA Test Split: {stats['hotpotqa_entries']} entries, {hotpotqa_doc_count} docs, {hotpotqa_mb:.2f} MB")
     logger.info(f"PubMedQA Test Split: {stats['pubmedqa_entries']} entries, {pubmedqa_doc_count} docs, {pubmedqa_mb:.2f} MB")
@@ -82,75 +83,31 @@ def load_and_store_data(limit=None, embedding_generator=None, embedding_size=Non
     logger.info(f"Document Collection Duration: {timings['doc_collection']:.2f}s")
     logger.info(f"Total Documents to Embed: {len(all_docs)}")
     
-    # Embedding generation
+    # Sequential embedding generation
     evaluator.start_monitoring()
     start_time = time.time()
     docs = []
     embedding_norms = []
     
-    if use_batch:
-        logger.info("Using batch embedding mode")
-        batch_size = 8
-        items = []
-        for item in tqdm(all_docs, desc="Generating batch embeddings", disable=True):
-            items.append(item)
-            if len(items) >= batch_size:
-                texts = [item["text"] for item in items]
-                embeddings, batch_timings = embedding_generator.generate_embedding(texts)
-                timings["query_preprocessing"] += batch_timings["query_preprocessing"]
-                timings["query_encoding"] += batch_timings["query_encoding"]
-                for embedding, item in zip(embeddings, items):
-                    norm = np.linalg.norm(embedding)
-                    embedding_norms.append(norm)
-                    if norm < 1e-6:
-                        logger.warning(f"Zero or near-zero embedding norm for text: {item['text'][:50]}...")
-                    docs.append({
-                        "text": item["text"],
-                        "embedding": embedding,
-                        "question_ids": item["question_ids"],
-                        "source": item["source"]
-                    })
-                items = []
-                torch.cuda.empty_cache()
-        if items:
-            texts = [item["text"] for item in items]
-            embeddings, batch_timings = embedding_generator.generate_embedding(texts)
-            timings["query_preprocessing"] += batch_timings["query_preprocessing"]
-            timings["query_encoding"] += batch_timings["query_encoding"]
-            for embedding, item in zip(embeddings, items):
-                norm = np.linalg.norm(embedding)
-                embedding_norms.append(norm)
-                if norm < 1e-6:
-                    logger.warning(f"Zero or near-zero embedding norm for text: {item['text'][:50]}...")
-                docs.append({
-                    "text": item["text"],
-                    "embedding": embedding,
-                    "question_ids": item["question_ids"],
-                    "source": item["source"]
-                })
-            torch.cuda.empty_cache()
-        timings["batch_embedding"] = time.time() - start_time
-        logger.info(f"Batch Embedding Duration: {timings['batch_embedding']:.2f}s")
-    else:
-        logger.info("Using sequential embedding mode")
-        for item in tqdm(all_docs, desc="Generating sequential embeddings", disable=True):
-            embedding, seq_timings = embedding_generator.generate_embedding(item["text"])
-            embedding = embedding[0]  # Single text input
-            norm = np.linalg.norm(embedding)
-            embedding_norms.append(norm)
-            if norm < 1e-6:
-                logger.warning(f"Zero or near-zero embedding norm for text: {item['text'][:50]}...")
-            timings["query_preprocessing"] += seq_timings["query_preprocessing"]
-            timings["query_encoding"] += seq_timings["query_encoding"]
-            docs.append({
-                "text": item["text"],
-                "embedding": embedding,
-                "question_ids": item["question_ids"],
-                "source": item["source"]
-            })
-            torch.cuda.empty_cache()
-        timings["sequential_embedding"] = time.time() - start_time
-        logger.info(f"Sequential Embedding Duration: {timings['sequential_embedding']:.2f}s")
+    logger.info("Using sequential embedding mode")
+    for item in tqdm(all_docs, desc="Generating sequential embeddings", disable=not VERBOSE):
+        embedding, seq_timings = embedding_generator.generate_embedding(item["text"])
+        embedding = embedding[0]  # Single text input
+        norm = np.linalg.norm(embedding)
+        embedding_norms.append(norm)
+        if norm < 1e-6:
+            logger.warning(f"Zero or near-zero embedding norm for text: {item['text'][:50]}...")
+        timings["query_preprocessing"] += seq_timings["query_preprocessing"]
+        timings["query_encoding"] += seq_timings["query_encoding"]
+        docs.append({
+            "text": item["text"],
+            "embedding": embedding,
+            "question_ids": item["question_ids"],
+            "source": item["source"]
+        })
+        torch.cuda.empty_cache()
+    timings["sequential_embedding"] = time.time() - start_time
+    logger.info(f"Sequential Embedding Duration: {timings['sequential_embedding']:.2f}s")
     
     logger.info(f"Total Query Preprocessing: {timings['query_preprocessing']:.2f}s")
     logger.info(f"Total Query Encoding: {timings['query_encoding']:.2f}s")
@@ -171,10 +128,11 @@ def load_and_store_data(limit=None, embedding_generator=None, embedding_size=Non
     logger.info(f"Database Clearing Duration: {timings['db_clearing']:.2f}s")
     
     start_time = time.time()
-    logger.info("Inserting documents in batch into MongoDB")
-    collection.insert_many(docs, ordered=False)
-    timings["batch_storage"] = time.time() - start_time
-    logger.info(f"Batch Document Storage Duration: {timings['batch_storage']:.2f}s")
+    logger.info("Inserting documents sequentially into MongoDB")
+    for doc in docs:
+        collection.insert_one(doc)
+    timings["sequential_storage"] = time.time() - start_time
+    logger.info(f"Sequential Document Storage Duration: {timings['sequential_storage']:.2f}s")
     
     logger.info("Setting up vector index")
     timings["document_indexing"] = setup_vector_index(collection, embedding_size)
@@ -183,9 +141,9 @@ def load_and_store_data(limit=None, embedding_generator=None, embedding_size=Non
     
     evaluator.log_resources("After Index Setup")
     total_docs = collection.count_documents({})
-    stats["docs_stored_batch"] = len(docs)
+    stats["docs_stored_sequential"] = len(docs)
     stats["db_entries"] = total_docs
     
-    logger.info(f"Stored {stats['docs_stored_batch']} documents in batch, {stats['db_entries']} entries in MongoDB.")
+    logger.info(f"Stored {stats['docs_stored_sequential']} documents sequentially, {stats['db_entries']} entries in MongoDB.")
     
     return collection, combined_dataset, timings, stats

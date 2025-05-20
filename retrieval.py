@@ -1,4 +1,4 @@
-from config import K, MODEL_CONFIGS
+from config import K, MODEL_CONFIGS, VERBOSE
 from system_evaluation import SystemEvaluator
 import time
 import logging
@@ -8,7 +8,6 @@ LOG_LIMIT = 4
 
 def retrieve_top_k(query_embedding, collection, num_candidates=100, model_name=None):
     """Retrieve top K documents based on vector similarity with timing."""
-    logging.basicConfig(level=logging.INFO, format="%(asctime)s - %(levelname)s - %(message)s")
     logger = logging.getLogger(__name__)
     evaluator = SystemEvaluator()
 
@@ -50,6 +49,7 @@ def retrieve_top_k(query_embedding, collection, num_candidates=100, model_name=N
     if not results_list:
         logger.warning(f"No results retrieved for query embedding (norm: {norm:.4f})")
 
-    logger.debug(f"Retrieved {len(results_list)} documents in {search_duration:.2f}s")
+    if VERBOSE:
+        logger.debug(f"Retrieved {len(results_list)} documents in {search_duration:.2f}s")
     
     return results_list, {"vector_search": search_duration}

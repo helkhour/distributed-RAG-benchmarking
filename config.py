@@ -57,3 +57,4 @@ COLLECTION_NAME = "hotpotqa_docs"
 K = 3
 DATASET_NAME = "rungalileo/ragbench"
 SUBSET_NAME = "hotpotqa"
+VERBOSE = False

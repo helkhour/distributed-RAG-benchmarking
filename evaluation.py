@@ -1,14 +1,12 @@
 import time
-from concurrent.futures import ThreadPoolExecutor
 from pymongo import MongoClient
-from config import DB_URI, DB_NAME
+from config import DB_URI, DB_NAME, VERBOSE
 from retrieval import retrieve_top_k
 import logging
 from difflib import SequenceMatcher
 
 def process_query(entry, collection, embedding_generator, num_candidates):
     """Process a single query and return metrics with timing."""
-    logging.basicConfig(level=logging.INFO, format="%(asctime)s - %(levelname)s - %(message)s")
     logger = logging.getLogger(__name__)
     
     query = entry["question"]
@@ -35,6 +33,9 @@ def process_query(entry, collection, embedding_generator, num_candidates):
         "vector_search": search_timings["vector_search"]
     }
     
+    if VERBOSE:
+        logger.debug(f"Query: {query[:50]}... processed in {latency:.4f}s")
+    
     return {
         "latency": latency,
         "results": results,
@@ -45,9 +46,8 @@ def process_query(entry, collection, embedding_generator, num_candidates):
         "timings": timings
     }
 
-def evaluate_retrieval_performance(dataset, collection, embedding_generator, max_workers=4, num_candidates=100):
-    """Evaluate retrieval performance with parallel queries and timing."""
-    logging.basicConfig(level=logging.INFO, format="%(asctime)s - %(levelname)s - %(message)s")
+def evaluate_retrieval_performance(dataset, collection, embedding_generator, num_candidates=100):
+    """Evaluate retrieval performance with sequential queries and timing."""
     logger = logging.getLogger(__name__)
     
     total_queries = len(dataset)
@@ -62,15 +62,16 @@ def evaluate_retrieval_performance(dataset, collection, embedding_generator, max
         "evaluation_overhead": 0.0
     }
 
-    logger.info(f"Starting evaluation with {total_queries} queries, {max_workers} workers, {num_candidates} candidates")
+    logger.info(f"Starting sequential evaluation with {total_queries} queries, {num_candidates} candidates")
     start_total_time = time.time()
     
     start_overhead = time.time()
-    with ThreadPoolExecutor(max_workers=max_workers) as executor:
-        results = list(executor.map(
-            lambda entry: process_query(entry, collection, embedding_generator, num_candidates), dataset
-        ))
+    results = []
+    for entry in dataset:
+        result = process_query(entry, collection, embedding_generator, num_candidates)
+        results.append(result)
     query_timings["evaluation_overhead"] = time.time() - start_overhead
+    logger.info(f"Evaluation Overhead Duration: {query_timings['evaluation_overhead']:.2f}s")
 
     for res in results:
         total_latency += res["latency"]
@@ -100,7 +101,10 @@ def evaluate_retrieval_performance(dataset, collection, embedding_generator, max
     logger.info(f"Retrieval Success: {retrieval_success:.2%} ({queries_with_results}/{total_queries} queries)")
     logger.info(f"Average Precision: {avg_precision:.2%} ({total_relevant}/{total_retrieved} docs)")
     logger.info(f"Average Latency: {avg_latency:.4f} seconds/query")
-    logger.info(f"Throughput: {throughput:.2f} queries/second (with {max_workers} workers, {num_candidates} candidates)")
+    logger.info(f"Throughput: {throughput:.2f} queries/second (sequential processing, {num_candidates} candidates)")
+    logger.info(f"Total Query Preprocessing: {query_timings['query_preprocessing']:.2f}s")
+    logger.info(f"Total Query Encoding: {query_timings['query_encoding']:.2f}s")
+    logger.info(f"Total Vector Search: {query_timings['vector_search']:.2f}s")
 
     return {
         "retrieval_success": retrieval_success,
