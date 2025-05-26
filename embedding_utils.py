@@ -14,47 +14,48 @@ class EmbeddingGenerator(nn.Module):
         logger = logging.getLogger(__name__)
         self.model_name = model_name
         self.embedding_size = embedding_size
-        self.device = "cuda"
+        # self.device = "cuda"
+        self.device = "cpu"
         self.base_model = MODEL_CONFIGS[model_name].get("base_model", model_name)
         
-        if "Llama-3.1" in model_name:
-            self.tokenizer = AutoTokenizer.from_pretrained(
-                self.base_model,
-                cache_dir="/home/ubuntu/rag_project/llama-3.1-8b",
-                token=True
-            )
-            if self.tokenizer.pad_token is None:
-                self.tokenizer.pad_token = self.tokenizer.eos_token
-                logger.info(f"Set pad_token to eos_token: {self.tokenizer.pad_token}")
-            
-            quantization_config = BitsAndBytesConfig(
-                load_in_4bit=True,
-                bnb_4bit_compute_dtype=torch.float16,
-                bnb_4bit_quant_type="nf4",
-                bnb_4bit_use_double_quant=True
-            ) if quantize else None
-            
-            self.model = AutoModel.from_pretrained(
-                self.base_model,
-                quantization_config=quantization_config,
-                cache_dir="/home/ubuntu/rag_project/llama-3.1-8b",
-                torch_dtype=torch.float16,
-                device_map="auto",
-                token=True
-            )
-            self.model.eval()
-            hidden_size = self.model.config.hidden_size
-            self.projection = nn.Linear(hidden_size, embedding_size, dtype=torch.float16).to(self.device)
-            self.projection.eval()
-        else:
-            self.model = SentenceTransformer(self.base_model).to(self.device)
-            self.model.eval()
-            hidden_size = self.model.get_sentence_embedding_dimension()
-            if "mxbai-embed-large-v1" in model_name:
-                self.output_size = embedding_size
-            elif "gte-base-384" in model_name and embedding_size == 384:
-                self.projection = nn.Linear(hidden_size, embedding_size, dtype=torch.float16).to(self.device)
-                self.projection.eval()
+        # if "Llama-3.1" in model_name:
+        #     self.tokenizer = AutoTokenizer.from_pretrained(
+        #         self.base_model,
+        #         cache_dir="/home/ubuntu/rag_project/llama-3.1-8b",
+        #         token=True
+        #     )
+        #     if self.tokenizer.pad_token is None:
+        #         self.tokenizer.pad_token = self.tokenizer.eos_token
+        #         logger.info(f"Set pad_token to eos_token: {self.tokenizer.pad_token}")
+        #     
+        #     quantization_config = BitsAndBytesConfig(
+        #         load_in_4bit=True,
+        #         bnb_4bit_compute_dtype=torch.float16,
+        #         bnb_4bit_quant_type="nf4",
+        #         bnb_4bit_use_double_quant=True
+        #     ) if quantize else None
+        #     
+        #     self.model = AutoModel.from_pretrained(
+        #         self.base_model,
+        #         quantization_config=quantization_config,
+        #         cache_dir="/home/ubuntu/rag_project/llama-3.1-8b",
+        #         torch_dtype=torch.float16,
+        #         device_map="auto",
+        #         token=True
+        #     )
+        #     self.model.eval()
+        #     hidden_size = self.model.config.hidden_size
+        #     self.projection = nn.Linear(hidden_size, embedding_size, dtype=torch.float16).to(self.device)
+        #     self.projection.eval()
+        # else:
+        self.model = SentenceTransformer(self.base_model).to(self.device)
+        self.model.eval()
+        hidden_size = self.model.get_sentence_embedding_dimension()
+        # if "mxbai-embed-large-v1" in model_name:
+        #     self.output_size = embedding_size
+        # elif "gte-base-384" in model_name and embedding_size == 384:
+        #     self.projection = nn.Linear(hidden_size, embedding_size, dtype=torch.float16).to(self.device)
+        #     self.projection.eval()
     
     def generate_embedding(self, texts):
         """Generate embeddings for a list of texts with timing."""
@@ -98,7 +99,7 @@ class EmbeddingGenerator(nn.Module):
         else:
             # Time encoding (includes preprocessing)
             start_time = time.time()
-            embedding = self.model.encode(texts, convert_to_tensor=True, batch_size=1)  # Sequential processing
+            embedding = self.model.encode(texts, convert_to_tensor=True, batch_size=1, show_progress_bar=False)  # Sequential processing
             encoding_duration = time.time() - start_time
             timings["query_encoding"] = encoding_duration
             logger.debug(f"Query Encoding Duration: {encoding_duration:.4f}s")

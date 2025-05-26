@@ -49,3 +49,11 @@ focus this week on :
 effect of embedding models and vary number of parameters in embedding model and size of output token
 effect of vector index on throughput
 
+
+
+
+
+
+
+
+ON CUDA it should run on GPU -fix that before pushing ! 

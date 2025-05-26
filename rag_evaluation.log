@@ -1,0 +1,108 @@
+2025-05-21 14:50:01,826 - data_loader - WARNING - Loading KILT corpus: corag/kilt-corpus with split: train[:10]
+2025-05-21 14:50:06,431 - data_loader - WARNING - Dataset Loading Duration: 4.60s
+2025-05-21 14:50:06,431 - data_loader - WARNING - Loading KILT queries: facebook/kilt_tasks with subset: hotpotqa
+2025-05-21 14:50:09,744 - data_loader - WARNING - KILT Corpus: 10 entries, 10 docs, 0.00 MB
+2025-05-21 14:50:09,744 - data_loader - WARNING - HotpotQA Queries: 10 entries, 22 docs, 0.00 MB
+2025-05-21 14:50:09,744 - data_loader - WARNING - Total Documents: 10 docs, 0.00 MB
+2025-05-21 14:50:09,744 - data_loader - WARNING - Query dataset size is small (10 entries). Ensure 'limit' is appropriate.
+2025-05-21 14:50:09,745 - data_loader - WARNING - Document Collection Duration: 0.00s
+2025-05-21 14:50:09,745 - data_loader - WARNING - Total Documents to Embed: 10
+2025-05-21 14:50:09,745 - data_loader - WARNING - Using sequential embedding mode
+2025-05-21 14:50:10,033 - data_loader - WARNING - Document Embedding Duration: 0.29s
+2025-05-21 14:50:10,049 - data_loader - WARNING - Database Connection Duration: 0.02s
+2025-05-21 14:50:10,070 - data_loader - WARNING - Database Clearing Duration: 0.02s
+2025-05-21 14:50:10,070 - data_loader - WARNING - Inserting documents sequentially into MongoDB
+2025-05-21 14:50:10,125 - data_loader - WARNING - Sequential Document Storage Duration: 0.05s
+2025-05-21 14:50:10,125 - data_loader - WARNING - Setting up vector index
+2025-05-21 14:50:10,699 - data_loader - WARNING - Document Indexing Duration: 0.57s
+2025-05-21 14:50:11,711 - data_loader - WARNING - Stored 10 documents sequentially, 10 entries in MongoDB.
+2025-05-21 14:50:15,417 - __main__ - WARNING - Zero precision detected for sentence-transformers/all-MiniLM-L6-v2 (sequential). Check embedding dimensions and vector index.
+2025-05-21 14:54:44,891 - data_loader - WARNING - Loading KILT corpus: corag/kilt-corpus with split: train[:10]
+2025-05-21 14:54:49,152 - data_loader - WARNING - Dataset Loading Duration: 4.26s
+2025-05-21 14:54:49,152 - data_loader - WARNING - Loading KILT queries: facebook/kilt_tasks with subset: hotpotqa
+2025-05-21 14:54:52,582 - data_loader - WARNING - KILT Corpus: 10 entries, 10 docs, 0.00 MB
+2025-05-21 14:54:52,582 - data_loader - WARNING - HotpotQA Queries: 10 entries, 22 docs, 0.00 MB
+2025-05-21 14:54:52,582 - data_loader - WARNING - Total Documents: 10 docs, 0.00 MB
+2025-05-21 14:54:52,582 - data_loader - WARNING - Query dataset size is small (10 entries). Ensure 'limit' is appropriate.
+2025-05-21 14:54:52,582 - data_loader - WARNING - Document Collection Duration: 0.00s
+2025-05-21 14:54:52,582 - data_loader - WARNING - Total Documents to Embed: 10
+2025-05-21 14:54:52,583 - data_loader - WARNING - Using sequential embedding mode
+2025-05-21 14:54:52,827 - data_loader - WARNING - Document Embedding Duration: 0.24s
+2025-05-21 14:54:52,850 - data_loader - WARNING - Database Connection Duration: 0.02s
+2025-05-21 14:54:52,873 - data_loader - WARNING - Database Clearing Duration: 0.02s
+2025-05-21 14:54:52,873 - data_loader - WARNING - Inserting documents sequentially into MongoDB
+2025-05-21 14:54:52,915 - data_loader - WARNING - Sequential Document Storage Duration: 0.04s
+2025-05-21 14:54:52,915 - data_loader - WARNING - Setting up vector index
+2025-05-21 14:54:53,462 - data_loader - WARNING - Document Indexing Duration: 0.55s
+2025-05-21 14:54:54,475 - data_loader - WARNING - Stored 10 documents sequentially, 10 entries in MongoDB.
+2025-05-21 14:54:57,746 - __main__ - WARNING - Zero precision detected for sentence-transformers/all-MiniLM-L6-v2 (sequential). Check embedding dimensions and vector index.
+2025-05-21 15:14:58,060 - data_loader - WARNING - Loading KILT corpus: corag/kilt-corpus with split: train[:100]
+2025-05-21 15:15:02,770 - data_loader - WARNING - Dataset Loading Duration: 4.71s
+2025-05-21 15:15:02,771 - data_loader - WARNING - Loading KILT queries: facebook/kilt_tasks with subset: hotpotqa
+2025-05-21 15:15:07,226 - data_loader - WARNING - KILT Corpus: 100 entries, 100 docs, 0.05 MB
+2025-05-21 15:15:07,226 - data_loader - WARNING - HotpotQA Queries: 100 entries, 215 docs, 0.00 MB
+2025-05-21 15:15:07,226 - data_loader - WARNING - Total Documents: 100 docs, 0.05 MB
+2025-05-21 15:15:07,228 - data_loader - WARNING - Document Collection Duration: 0.00s
+2025-05-21 15:15:07,228 - data_loader - WARNING - Total Documents to Embed: 100
+2025-05-21 15:15:07,228 - data_loader - WARNING - Using sequential embedding mode
+2025-05-21 15:15:08,812 - data_loader - WARNING - Document Embedding Duration: 1.58s
+2025-05-21 15:15:08,822 - data_loader - WARNING - Database Connection Duration: 0.01s
+2025-05-21 15:15:08,842 - data_loader - WARNING - Database Clearing Duration: 0.02s
+2025-05-21 15:15:08,842 - data_loader - WARNING - Inserting documents sequentially into MongoDB
+2025-05-21 15:15:09,120 - data_loader - WARNING - Sequential Document Storage Duration: 0.28s
+2025-05-21 15:15:09,120 - data_loader - WARNING - Setting up vector index
+2025-05-21 15:15:09,674 - data_loader - WARNING - Document Indexing Duration: 0.55s
+2025-05-21 15:15:10,695 - data_loader - WARNING - Stored 100 documents sequentially, 100 entries in MongoDB.
+2025-05-21 15:15:16,228 - __main__ - WARNING - Zero precision detected for sentence-transformers/all-MiniLM-L6-v2 (sequential). Check embedding dimensions and vector index.
+2025-05-25 20:01:31,318 - data_loader - WARNING - Loading KILT corpus: corag/kilt-corpus with split: train[:100]
+2025-05-25 20:01:34,801 - data_loader - WARNING - Dataset Loading Duration: 3.48s
+2025-05-25 20:01:34,801 - data_loader - WARNING - Loading KILT queries: facebook/kilt_tasks with subset: hotpotqa
+2025-05-25 20:01:38,809 - data_loader - WARNING - KILT Corpus: 100 entries, 100 docs, 0.05 MB
+2025-05-25 20:01:38,809 - data_loader - WARNING - HotpotQA Queries: 100 entries, 215 docs, 0.00 MB
+2025-05-25 20:01:38,809 - data_loader - WARNING - Total Documents: 100 docs, 0.05 MB
+2025-05-25 20:01:38,815 - data_loader - WARNING - Document Collection Duration: 0.01s
+2025-05-25 20:01:38,815 - data_loader - WARNING - Total Documents to Embed: 100
+2025-05-25 20:01:38,815 - data_loader - WARNING - Using sequential embedding mode
+2025-05-25 20:01:48,297 - data_loader - WARNING - Document Embedding Duration: 9.48s
+2025-05-25 20:02:48,468 - db_utils - ERROR - Connection attempt 1/5 failed: localhost:32768: [Errno 111] Connection refused (configured timeouts: socketTimeoutMS: 60000.0ms, connectTimeoutMS: 60000.0ms), Timeout: 60.0s, Topology Description: <TopologyDescription id: 68334cfcfa3e9309642d97ec, topology_type: Single, servers: [<ServerDescription ('localhost', 32768) server_type: Unknown, rtt: None, error=AutoReconnect('localhost:32768: [Errno 111] Connection refused (configured timeouts: socketTimeoutMS: 60000.0ms, connectTimeoutMS: 60000.0ms)')>]>
+2025-05-25 20:03:53,644 - db_utils - ERROR - Connection attempt 2/5 failed: localhost:32768: [Errno 111] Connection refused (configured timeouts: socketTimeoutMS: 60000.0ms, connectTimeoutMS: 60000.0ms), Timeout: 60.0s, Topology Description: <TopologyDescription id: 68334d3dfa3e9309642d97ed, topology_type: Single, servers: [<ServerDescription ('localhost', 32768) server_type: Unknown, rtt: None, error=AutoReconnect('localhost:32768: [Errno 111] Connection refused (configured timeouts: socketTimeoutMS: 60000.0ms, connectTimeoutMS: 60000.0ms)')>]>
+2025-05-25 20:05:03,802 - db_utils - ERROR - Connection attempt 3/5 failed: localhost:32768: [Errno 111] Connection refused (configured timeouts: socketTimeoutMS: 60000.0ms, connectTimeoutMS: 60000.0ms), Timeout: 60.0s, Topology Description: <TopologyDescription id: 68334d83fa3e9309642d97ee, topology_type: Single, servers: [<ServerDescription ('localhost', 32768) server_type: Unknown, rtt: None, error=AutoReconnect('localhost:32768: [Errno 111] Connection refused (configured timeouts: socketTimeoutMS: 60000.0ms, connectTimeoutMS: 60000.0ms)')>]>
+2025-05-25 20:06:23,965 - db_utils - ERROR - Connection attempt 4/5 failed: localhost:32768: [Errno 111] Connection refused (configured timeouts: socketTimeoutMS: 60000.0ms, connectTimeoutMS: 60000.0ms), Timeout: 60.0s, Topology Description: <TopologyDescription id: 68334dd3fa3e9309642d97ef, topology_type: Single, servers: [<ServerDescription ('localhost', 32768) server_type: Unknown, rtt: None, error=AutoReconnect('localhost:32768: [Errno 111] Connection refused (configured timeouts: socketTimeoutMS: 60000.0ms, connectTimeoutMS: 60000.0ms)')>]>
+2025-05-25 20:08:04,140 - db_utils - ERROR - Connection attempt 5/5 failed: localhost:32768: [Errno 111] Connection refused (configured timeouts: socketTimeoutMS: 60000.0ms, connectTimeoutMS: 60000.0ms), Timeout: 60.0s, Topology Description: <TopologyDescription id: 68334e37fa3e9309642d97f0, topology_type: Single, servers: [<ServerDescription ('localhost', 32768) server_type: Unknown, rtt: None, error=AutoReconnect('localhost:32768: [Errno 111] Connection refused (configured timeouts: socketTimeoutMS: 60000.0ms, connectTimeoutMS: 60000.0ms)')>]>
+2025-05-25 20:08:04,140 - db_utils - ERROR - Failed to connect to MongoDB at mongodb://localhost:32768/?directConnection=true after 5 attempts.
+2025-05-25 20:08:04,140 - db_utils - ERROR - Ensure MongoDB is running and accessible. Check DB_URI, port, and network settings.
+2025-05-25 20:10:27,205 - data_loader - WARNING - Loading KILT corpus: corag/kilt-corpus with split: train[:100]
+2025-05-25 20:10:31,630 - data_loader - WARNING - Dataset Loading Duration: 4.42s
+2025-05-25 20:10:31,630 - data_loader - WARNING - Loading KILT queries: facebook/kilt_tasks with subset: hotpotqa
+2025-05-25 20:10:34,456 - data_loader - WARNING - KILT Corpus: 100 entries, 100 docs, 0.05 MB
+2025-05-25 20:10:34,456 - data_loader - WARNING - HotpotQA Queries: 100 entries, 215 docs, 0.00 MB
+2025-05-25 20:10:34,456 - data_loader - WARNING - Total Documents: 100 docs, 0.05 MB
+2025-05-25 20:10:34,463 - data_loader - WARNING - Document Collection Duration: 0.01s
+2025-05-25 20:10:34,463 - data_loader - WARNING - Total Documents to Embed: 100
+2025-05-25 20:10:34,464 - data_loader - WARNING - Using sequential embedding mode
+2025-05-25 20:10:40,528 - data_loader - WARNING - Document Embedding Duration: 6.06s
+2025-05-25 20:10:40,549 - data_loader - WARNING - Database Connection Duration: 0.02s
+2025-05-25 20:10:40,552 - data_loader - WARNING - Database Clearing Duration: 0.00s
+2025-05-25 20:10:40,552 - data_loader - WARNING - Inserting documents sequentially into MongoDB
+2025-05-25 20:10:40,935 - data_loader - WARNING - Sequential Document Storage Duration: 0.38s
+2025-05-25 20:10:40,935 - data_loader - WARNING - Setting up vector index
+2025-05-25 20:10:42,327 - data_loader - WARNING - Document Indexing Duration: 1.39s
+2025-05-25 20:10:43,333 - data_loader - WARNING - Stored 100 documents sequentially, 100 entries in MongoDB.
+2025-05-25 20:11:12,819 - __main__ - WARNING - Zero precision detected for sentence-transformers/all-MiniLM-L6-v2 (sequential). Check embedding dimensions and vector index.
+2025-05-26 19:48:20,969 - data_loader - WARNING - Loading KILT corpus: corag/kilt-corpus with split: train[:10000]
+2025-05-26 19:48:24,917 - data_loader - WARNING - Dataset Loading Duration: 3.95s
+2025-05-26 19:48:24,917 - data_loader - WARNING - Loading KILT queries: facebook/kilt_tasks with subset: hotpotqa
+2025-05-26 19:48:31,880 - data_loader - WARNING - KILT Corpus: 10000 entries, 10000 docs, 4.78 MB
+2025-05-26 19:48:31,880 - data_loader - WARNING - HotpotQA Queries: 10000 entries, 18214 docs, 0.30 MB
+2025-05-26 19:48:31,880 - data_loader - WARNING - Total Documents: 10000 docs, 4.78 MB
+2025-05-26 19:48:32,283 - data_loader - WARNING - Document Collection Duration: 0.40s
+2025-05-26 19:48:32,283 - data_loader - WARNING - Total Documents to Embed: 10000
+2025-05-26 19:48:32,283 - data_loader - WARNING - Using sequential embedding mode
+2025-05-26 19:58:36,484 - data_loader - WARNING - Document Embedding Duration: 604.20s
+2025-05-26 19:58:36,517 - data_loader - WARNING - Database Connection Duration: 0.02s
+2025-05-26 19:58:36,537 - data_loader - WARNING - Database Clearing Duration: 0.02s
+2025-05-26 19:58:36,538 - data_loader - WARNING - Inserting documents sequentially into MongoDB
+2025-05-26 19:59:13,691 - data_loader - WARNING - Sequential Document Storage Duration: 37.15s
+2025-05-26 19:59:13,691 - data_loader - WARNING - Setting up vector index
+2025-05-26 19:59:16,318 - data_loader - WARNING - Document Indexing Duration: 2.63s
+2025-05-26 19:59:17,346 - data_loader - WARNING - Stored 10000 documents sequentially, 10000 entries in MongoDB.

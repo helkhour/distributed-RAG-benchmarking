@@ -53,8 +53,11 @@ MODEL_CONFIGS = {
 
 DB_URI = "mongodb://localhost:32768/?directConnection=true"
 DB_NAME = "rag_db"
-COLLECTION_NAME = "hotpotqa_docs"
+COLLECTION_NAME = "kilt_docs"
 K = 3
-DATASET_NAME = "rungalileo/ragbench"
+DATASET_NAME = "facebook/kilt_tasks"
 SUBSET_NAME = "hotpotqa"
-VERBOSE = False
+CORPUS_NAME = "corag/kilt-corpus"
+CORPUS_LIMIT = 10000
+limit=10000
+VERBOSE = False 

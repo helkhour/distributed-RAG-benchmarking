@@ -1,55 +1,50 @@
-from config import K, MODEL_CONFIGS, VERBOSE
-from system_evaluation import SystemEvaluator
-import time
-import logging
+from pymongo import MongoClient
 import numpy as np
+import logging
+import time
 
-LOG_LIMIT = 4
-
-def retrieve_top_k(query_embedding, collection, num_candidates=100, model_name=None):
-    """Retrieve top K documents based on vector similarity with timing."""
+def retrieve_top_k(query_embedding, collection, num_candidates):
+    """Retrieve top-K documents from MongoDB using vector search."""
     logger = logging.getLogger(__name__)
-    evaluator = SystemEvaluator()
-
-    if model_name:
-        expected_dim = MODEL_CONFIGS[model_name]["embedding_size"]
-        if len(query_embedding) != expected_dim:
-            logger.error(f"Query embedding dimension mismatch: expected {expected_dim}, got {len(query_embedding)}")
-            raise ValueError(f"Query embedding dimension mismatch: expected {expected_dim}, got {len(query_embedding)}")
-        
-        norm = np.linalg.norm(query_embedding)
-        if norm < 1e-6:
-            logger.warning(f"Query embedding has zero or near-zero norm: {norm:.4f}")
-
     
     start_time = time.time()
-    results = collection.aggregate([
+    # Ensure query_embedding is a list
+    query_embedding = np.array(query_embedding, dtype=np.float32).tolist()
+    
+    # MongoDB vector search pipeline
+    pipeline = [
         {
             "$vectorSearch": {
-                "queryVector": query_embedding,
-                "path": "embedding",
                 "index": "vector_index",
-                "limit": K,
-                "numCandidates": num_candidates
+                "path": "embedding",
+                "queryVector": query_embedding,
+                "numCandidates": num_candidates * 10,
+                "limit": num_candidates
             }
         },
         {
             "$project": {
-                "_id": 0,
                 "text": 1,
-                "question_ids": 1,
-                "source": 1
+                "embedding": 1,
+                "wikipedia_id": 1,
+                "wikipedia_title": 1,
+                "source": 1,
+                "_id": 0
             }
         }
-    ])
-    results_list = list(results)
-    search_duration = time.time() - start_time
+    ]
     
-
-    if not results_list:
-        logger.warning(f"No results retrieved for query embedding (norm: {norm:.4f})")
-
-    if VERBOSE:
-        logger.debug(f"Retrieved {len(results_list)} documents in {search_duration:.2f}s")
+    try:
+        results = list(collection.aggregate(pipeline))
+        if not results:
+            logger.warning("No documents retrieved from vector search.")
+        else:
+            logger.debug(f"Retrieved document fields: {list(results[0].keys())}")
+    except Exception as e:
+        logger.error(f"Vector search failed: {str(e)}")
+        results = []
     
-    return results_list, {"vector_search": search_duration}
+    search_time = time.time() - start_time
+    logger.info(f"Vector search retrieved {len(results)} documents in {search_time:.4f}s")
+    
+    return results, {"vector_search": search_time}

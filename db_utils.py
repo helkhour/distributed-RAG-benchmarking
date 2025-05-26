@@ -27,7 +27,7 @@ def get_db_connection(max_retries=5, retry_delay=5, server_timeout_ms=60000):
         except ServerSelectionTimeoutError as e:
             logger.error(f"Connection attempt {attempt + 1}/{max_retries} failed: {e}")
             if attempt < max_retries - 1:
-                wait_time = retry_delay * (2 ** attempt)  # Exponential backoff
+                wait_time = retry_delay * (2 ** attempt) 
                 logger.info(f"Retrying in {wait_time} seconds...")
                 time.sleep(wait_time)
             else:
