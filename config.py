@@ -1,9 +1,4 @@
 MODEL_CONFIGS = {
-    "meta-llama/Meta-Llama-3.1-8B": {
-        "base_model": "meta-llama/Meta-Llama-3.1-8B-Instruct",
-        "embedding_size": 4096,
-        "parameters": 8_000_000_000
-    },
     "mixedbread-ai/mxbai-embed-large-v1-256": {
         "base_model": "mixedbread-ai/mxbai-embed-large-v1",
         "embedding_size": 256,
@@ -51,13 +46,19 @@ MODEL_CONFIGS = {
     }
 }
 
+DB_CONFIG = {
+    "index_timeout_s": 300
+}
+
 DB_URI = "mongodb://localhost:32768/?directConnection=true"
 DB_NAME = "rag_db"
 COLLECTION_NAME = "kilt_docs"
 K = 3
+numCandidates = 100
 DATASET_NAME = "facebook/kilt_tasks"
 SUBSET_NAME = "hotpotqa"
 CORPUS_NAME = "corag/kilt-corpus"
-CORPUS_LIMIT = 10000
-limit=10000
-VERBOSE = False 
+CORPUS_LIMIT = 100 #None for no limit
+limit = 100
+VERBOSE = False
+BATCH_SIZE = 64

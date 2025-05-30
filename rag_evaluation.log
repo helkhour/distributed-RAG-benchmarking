@@ -106,3 +106,30 @@
 2025-05-26 19:59:13,691 - data_loader - WARNING - Setting up vector index
 2025-05-26 19:59:16,318 - data_loader - WARNING - Document Indexing Duration: 2.63s
 2025-05-26 19:59:17,346 - data_loader - WARNING - Stored 10000 documents sequentially, 10000 entries in MongoDB.
+2025-05-26 21:24:58,236 - data_loader - WARNING - Loading KILT corpus: corag/kilt-corpus with split: train[:10000]
+2025-05-26 21:25:01,576 - data_loader - WARNING - Dataset Loading Duration: 3.34s
+2025-05-26 21:25:01,576 - data_loader - WARNING - Loading KILT queries: facebook/kilt_tasks with subset: hotpotqa
+2025-05-26 21:25:07,406 - data_loader - WARNING - KILT Corpus: 10000 entries, 10000 docs, 4.78 MB
+2025-05-26 21:25:07,406 - data_loader - WARNING - HotpotQA Queries: 10000 entries, 18214 docs, 0.30 MB
+2025-05-26 21:25:07,406 - data_loader - WARNING - Total Documents: 10000 docs, 4.78 MB
+2025-05-26 21:25:07,912 - data_loader - WARNING - Document Collection Duration: 0.51s
+2025-05-26 21:25:07,912 - data_loader - WARNING - Total Documents to Embed: 10000
+2025-05-26 21:25:07,912 - data_loader - WARNING - Using sequential embedding mode
+2025-05-26 21:25:58,039 - data_loader - WARNING - Loading KILT corpus: corag/kilt-corpus with split: train[:100]
+2025-05-26 21:26:01,169 - data_loader - WARNING - Dataset Loading Duration: 3.13s
+2025-05-26 21:26:01,169 - data_loader - WARNING - Loading KILT queries: facebook/kilt_tasks with subset: hotpotqa
+2025-05-26 21:26:05,261 - data_loader - WARNING - KILT Corpus: 100 entries, 100 docs, 0.05 MB
+2025-05-26 21:26:05,261 - data_loader - WARNING - HotpotQA Queries: 100 entries, 215 docs, 0.00 MB
+2025-05-26 21:26:05,261 - data_loader - WARNING - Total Documents: 100 docs, 0.05 MB
+2025-05-26 21:26:05,267 - data_loader - WARNING - Document Collection Duration: 0.01s
+2025-05-26 21:26:05,267 - data_loader - WARNING - Total Documents to Embed: 100
+2025-05-26 21:26:05,267 - data_loader - WARNING - Using sequential embedding mode
+2025-05-26 21:26:10,046 - data_loader - WARNING - Document Embedding Duration: 4.78s
+2025-05-26 21:26:10,061 - data_loader - WARNING - Database Connection Duration: 0.01s
+2025-05-26 21:26:10,185 - data_loader - WARNING - Database Clearing Duration: 0.12s
+2025-05-26 21:26:10,185 - data_loader - WARNING - Inserting documents sequentially into MongoDB
+2025-05-26 21:26:10,662 - data_loader - WARNING - Sequential Document Storage Duration: 0.48s
+2025-05-26 21:26:10,662 - data_loader - WARNING - Setting up vector index
+2025-05-26 21:26:11,353 - data_loader - WARNING - Document Indexing Duration: 0.69s
+2025-05-26 21:26:12,359 - data_loader - WARNING - Stored 100 documents sequentially, 100 entries in MongoDB.
+2025-05-26 21:26:28,376 - __main__ - WARNING - Zero precision detected for sentence-transformers/all-MiniLM-L6-v2 (sequential). Check embedding dimensions and vector index.

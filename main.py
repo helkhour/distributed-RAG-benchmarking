@@ -4,7 +4,7 @@ from sentence_transformers import SentenceTransformer
 from data_loader import load_and_store_data
 from evaluation import evaluate_retrieval_performance
 from embedding_utils import EmbeddingGenerator
-from config import MODEL_CONFIGS, VERBOSE, limit
+from config import MODEL_CONFIGS, VERBOSE, limit, K, numCandidates
 from system_evaluation import SystemEvaluator
 
 def run_study(model_name, embedding_size):
@@ -13,40 +13,33 @@ def run_study(model_name, embedding_size):
     
     evaluator = SystemEvaluator()
     results = {}
-    logger.info("Running sequential embedding mode")
-    quantize = "Llama-3.1" in model_name
-    embedding_generator = EmbeddingGenerator(model_name, embedding_size, quantize=quantize)
+    logger.info("Running batch embedding mode")
+    embedding_generator = EmbeddingGenerator(model_name, embedding_size, quantize=False)
     
     evaluator.start_monitoring()
-    collection, dataset, data_timings, data_stats = load_and_store_data(
+    collection, dataset_raw, data_timings, data_stats = load_and_store_data(
         limit=limit, embedding_generator=embedding_generator, embedding_size=embedding_size
     )
-    data_duration, data_cpu_delta = evaluator.end_monitoring("Data Load (sequential)")
-    
-    logger.info(f"\nRunning evaluation (30 candidates, sequential)...")
+    data_duration, data_cpu_delta = evaluator.end_monitoring("Data Load (batch)")
+
+    # Ensure dataset is a list of dictionaries
+    dataset = [dict(item) for item in dataset_raw]
+
+    logger.info(f"\nRunning evaluation (top-{K}, numCandidates={numCandidates}, batch)...")
     evaluator.start_monitoring()
-    metrics_30 = evaluate_retrieval_performance(
-        dataset, collection, embedding_generator, num_candidates=30
+    metrics_k = evaluate_retrieval_performance(
+        dataset, collection, embedding_generator, k=K, num_candidates=numCandidates
     )
-    eval_duration_30, eval_cpu_delta_30 = evaluator.end_monitoring("Evaluation (30 candidates, sequential)")
+    eval_duration_k, eval_cpu_delta_k = evaluator.end_monitoring(f"Evaluation (top-{K}, batch)")
     
-    logger.info(f"\nRunning evaluation (100 candidates, sequential)...")
-    evaluator.start_monitoring()
-    metrics_100 = evaluate_retrieval_performance(
-        dataset, collection, embedding_generator, num_candidates=100
-    )
-    eval_duration_100, eval_cpu_delta_100 = evaluator.end_monitoring("Evaluation (100 candidates, sequential)")
+    if metrics_k["avg_precision"] == 0:
+        logger.warning(f"Zero precision detected for {model_name} (batch). Check embedding dimensions and vector index.")
     
-    if metrics_30["avg_precision"] == 0 or metrics_100["avg_precision"] == 0:
-        logger.warning(f"Zero precision detected for {model_name} (sequential). Check embedding dimensions and vector index.")
-    
-    results["sequential"] = {
+    results["batch"] = {
         "data_timings": data_timings,
         "data_stats": data_stats,
-        "metrics_30": metrics_30,
-        "metrics_100": metrics_100,
-        "eval_duration_30": eval_duration_30,
-        "eval_duration_100": eval_duration_100
+        "metrics_k": metrics_k,
+        "eval_duration_k": eval_duration_k
     }
     
     return results
@@ -57,13 +50,11 @@ def summarize_results(model_name, results):
     embedding_size = config["embedding_size"]
     parameters = config.get("parameters", "Unknown")
 
-    timings = results["sequential"]
+    timings = results["batch"]
     data_timings = timings["data_timings"]
     data_stats = timings["data_stats"]
-    metrics_30 = timings["metrics_30"]
-    metrics_100 = timings["metrics_100"]
+    metrics_k = timings["metrics_k"]
 
-    # Pipeline timings only (exclude evaluation)
     pipeline_timings = {
         "Database Connection": data_timings["db_connection"],
         "Dataset Loading": data_timings["dataset_load"],
@@ -74,13 +65,11 @@ def summarize_results(model_name, results):
         "Document Indexing": data_timings["document_indexing"]
     }
 
-    # Calculate total pipeline time
     total_pipeline_time = sum(pipeline_timings.values())
-    
-    # Calculate proportions
     proportions = {key: (value / total_pipeline_time * 100) if total_pipeline_time > 0 else 0.0 for key, value in pipeline_timings.items()}
 
-    logger.info(f"\n=== Summary for Model: {model_name} (Sequential Embedding) ===")
+    logger.info(f"\n=== Summary for Model: {model_name} (Batch Embedding) ===")
+    logger.debug(f"Summary data: embedding_size={embedding_size}, parameters={parameters}")
     logger.info(f"Model Specs:")
     if parameters != "Unknown":
         logger.info(f"  Parameters: {parameters:,} (~{parameters // 1_000_000}M)")
@@ -100,10 +89,10 @@ def summarize_results(model_name, results):
     logger.info(f"{'KILT Corpus Size (MB)':<40} {data_stats['corpus_size_mb']:<20.2f}")
     logger.info(f"{'HotpotQA Size (MB)':<40} {data_stats['hotpotqa_size_mb']:<20.2f}")
     logger.info(f"{'Total Dataset Size (MB)':<40} {data_stats['total_size_mb']:<20.2f}")
-    logger.info(f"{'Documents Stored (Sequential)':<40} {data_stats['docs_stored_sequential']:<20}")
+    logger.info(f"{'Documents Stored (Batch)':<40} {data_stats['docs_stored_batch']:<20}")
     logger.info(f"{'Database Entries':<40} {data_stats['db_entries']:<20}")
-    logger.info(f"{'Database Size (MB)':<40} {metrics_30['db_size_mb']:<20.2f}")
-    logger.info(f"{'Total Queries Evaluated':<40} {metrics_30['total_queries']:<20}")
+    logger.info(f"{'Database Size (MB)':<40} {metrics_k['db_size_mb']:<20.2f}")
+    logger.info(f"{'Total Queries Evaluated':<40} {metrics_k['total_queries']:<20}")
     logger.info(f"{'Embedding Mode':<40} {data_stats['embedding_mode']:<20}")
     
     logger.info(f"\nTiming Breakdown (RAG Pipeline, Total Time: {total_pipeline_time:.2f}s):")
@@ -112,47 +101,48 @@ def summarize_results(model_name, results):
     for key, duration in pipeline_timings.items():
         logger.info(f"{key:<30} {duration:<12.2f} {proportions[key]:<15.2f}")
     
-    logger.info(f"\nEvaluation Metrics (30 candidates):")
-    logger.info(f"  Latency (s/query): {metrics_30['avg_latency']:.4f}")
-    logger.info(f"  Throughput (q/s): {metrics_30['throughput']:.2f}")
-    logger.info(f"  Precision (%): {metrics_30['avg_precision'] * 100:.2f}")
-    logger.info(f"\nEvaluation Metrics (100 candidates):")
-    logger.info(f"  Latency (s/query): {metrics_100['avg_latency']:.4f}")
-    logger.info(f"  Throughput (q/s): {metrics_100['throughput']:.2f}")
-    logger.info(f"  Precision (%): {metrics_100['avg_precision'] * 100:.2f}")
+    logger.info(f"\nEvaluation Metrics (top-{K}, numCandidates={numCandidates}):")
+    logger.info(f"  Latency (s/query): {metrics_k['avg_latency']:.4f}")
+    logger.info(f"  Throughput (q/s): {metrics_k['throughput']:.2f}")
+    logger.info(f"  Precision@{K} (%): {metrics_k['avg_precision'] * 100:.2f}")
 
 def main():
     transformers_logging.set_verbosity_error()
     logging.basicConfig(
-        level=logging.WARNING, 
+        level=logging.DEBUG,
         format="%(asctime)s - %(name)s - %(levelname)s - %(message)s",
         handlers=[
             logging.FileHandler("rag_evaluation.log"),
             logging.StreamHandler()
         ]
-    )
+    )   
+    # Suppress INFO logs from specific modules
+    for logger_name in [
+        'pymongo', 'pymongo.topology', 'pymongo.serverSelection', 'pymongo.connection', 'pymongo.command',
+        'urllib3', 'urllib3.connectionpool',
+        'filelock',
+        'fsspec', 'fsspec.local',
+        'sentence_transformers.SentenceTransformer',
+        'system_evaluation',
+        'embedding_utils',  # Suppress embedding_utils INFO logs
+        'evaluation',      # Suppress evaluation INFO logs
+        'retrieval'        # Suppress retrieval INFO logs
+    ]:
+        logging.getLogger(logger_name).setLevel(logging.WARNING)
+
     logger = logging.getLogger(__name__)
-    logger.info("Starting RAG evaluation...")
+    logger.info("Starting RAG retrieval evaluation...")
+    logger.debug(f"Configured models: {list(MODEL_CONFIGS.keys())}")
     models = [
-        #"meta-llama/Meta-Llama-3.1-8B", 
-        #"mixedbread-ai/mxbai-embed-large-v1-256",
-        #"mixedbread-ai/mxbai-embed-large-v1-512",
-        #"mixedbread-ai/mxbai-embed-large-v1-1024", 
-        "sentence-transformers/all-MiniLM-L6-v2"
-        #"intfloat/e5-small-v2", 
-        #"thenlper/gte-base-384", 
-        #"sentence-transformers/all-mpnet-base-v2",
-        #"BAAI/bge-base-en-v1.5",
-        #"thenlper/gte-base"    
+        "sentence-transformers/all-MiniLM-L6-v2",
+        # "mixedbread-ai/mxbai-embed-large-v1-512"
     ]
 
     for model_name in models:
         embedding_size = MODEL_CONFIGS[model_name]["embedding_size"]
+        logger.debug(f"Running study for model: {model_name}, embedding_size: {embedding_size}")
         results = run_study(model_name, embedding_size)
         summarize_results(model_name, results)
 
 if __name__ == "__main__":
     main()
-
-
-  

@@ -11,7 +11,21 @@ sudo apt-get install -y gnupg curl ca-certificates python3-venv python3-dev buil
 
 # Install CUDA Toolkit 12.2
 
-sudo apt install nvidia-cuda-toolkit
+wget https://developer.download.nvidia.com/compute/cuda/repos/ubuntu2204/x86_64/cuda-ubuntu2204.pin
+sudo mv cuda-ubuntu2204.pin /etc/apt/preferences.d/cuda-repository-pin-600
+
+sudo apt-key adv --fetch-keys https://developer.download.nvidia.com/compute/cuda/repos/ubuntu2204/x86_64/3bf863cc.pub
+
+sudo add-apt-repository "deb https://developer.download.nvidia.com/compute/cuda/repos/ubuntu2204/x86_64/ /"
+
+sudo apt update
+sudo apt install -y cuda-toolkit-12-0
+
+export PATH=/usr/local/cuda-12.0/bin:$PATH
+export LD_LIBRARY_PATH=/usr/local/cuda-12.0/lib64:$LD_LIBRARY_PATH
+
+source ~/.bashrc
+
 
 # MongoDB Atlas CLI
 curl -fsSL https://pgp.mongodb.com/server-7.0.asc | sudo gpg -o /usr/share/keyrings/mongodb-server-7.0.gpg --dearmor
@@ -66,7 +80,9 @@ pip install huggingface_hub[cli]
 pip install -r requirements.txt
 pip install --upgrade bitsandbytes
 
-huggingface-cli login  # use fine-grained token with read accesss +++ permissions
+# huggingface-cli login  
+
+# use fine-grained token with read accesss +++ permissions
 
 #atlas deployments setup --type local
 #atlas deployments connect 
