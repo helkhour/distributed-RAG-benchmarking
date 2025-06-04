@@ -63,15 +63,13 @@ def load_and_store_data(limit=None, embedding_generator=None, embedding_size=Non
     
     # Load KILT corpus
     start_time = time.time()
-    split = "train" if limit is None else f"train[:{limit}]"
+    split = "train" if CORPUS_LIMIT is None else f"train[:{CORPUS_LIMIT}]"
     logger.info(f"Loading KILT corpus: {CORPUS_NAME} with split: {split}")
     try:
         kilt_corpus = load_dataset(CORPUS_NAME, split=split)
     except Exception as e:
         logger.error(f"Failed to load KILT corpus: {str(e)}")
         raise
-    if CORPUS_LIMIT:
-        kilt_corpus = kilt_corpus.select(range(min(CORPUS_LIMIT, len(kilt_corpus))))
     timings["dataset_load"] = time.time() - start_time
     # logger.debug(f"Dataset Loading Duration: {timings['dataset_load']:.2f}s, corpus size={len(kilt_corpus)}")
     

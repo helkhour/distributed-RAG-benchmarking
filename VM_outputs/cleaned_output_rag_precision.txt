@@ -1343,14 +1343,6 @@ Data Load (sequential) - Duration: 148.29s, CPU Time Delta: 132.61s, CPU: 0.00%,
 2025-05-06 16:12:23,335 - INFO - 
 Running evaluation (30 candidates, sequential)...
 2025-05-06 16:12:23,335 - INFO - Starting evaluation with 2840 queries, 4 workers, 30 candidates
-Batches: 100%|██████████| 1/1 [00:01<00:00,  1.22s/it][A
-Batches: 100%|██████████| 1/1 [00:01<00:00,  1.23s/it]
-Batches: 100%|██████████| 1/1 [00:01<00:00,  1.26s/it]
-Batches: 100%|██████████| 1/1 [00:01<00:00,  1.26s/it]
-Batches: 100%|██████████| 1/1 [00:01<00:00,  1.30s/it][A[A
-Batches: 100%|██████████| 1/1 [00:01<00:00,  1.32s/it]
-Batches: 100%|██████████| 1/1 [00:01<00:00,  1.26s/it][A[A[A
-Batches: 100%|██████████| 1/1 [00:01<00:00,  1.26s/it]
 2025-05-06 16:13:54,078 - INFO - 
 === Retrieval Performance Summary ===
 2025-05-06 16:13:54,078 - INFO - Database Size: 70.74 MB (13807 documents)
@@ -1362,14 +1354,6 @@ Evaluation (30 candidates, sequential) - Duration: 90.75s, CPU Time Delta: 131.2
 2025-05-06 16:13:55,086 - INFO - 
 Running evaluation (100 candidates, sequential)...
 2025-05-06 16:13:55,087 - INFO - Starting evaluation with 2840 queries, 4 workers, 100 candidates
-Batches: 100%|██████████| 1/1 [00:01<00:00,  1.20s/it]
-Batches: 100%|██████████| 1/1 [00:01<00:00,  1.20s/it]
-Batches: 100%|██████████| 1/1 [00:01<00:00,  1.15s/it][A[A
-Batches: 100%|██████████| 1/1 [00:01<00:00,  1.15s/it]
-Batches: 100%|██████████| 1/1 [00:01<00:00,  1.24s/it][A
-Batches: 100%|██████████| 1/1 [00:01<00:00,  1.24s/it]
-Batches: 100%|██████████| 1/1 [00:01<00:00,  1.31s/it][A[A[A
-Batches: 100%|██████████| 1/1 [00:01<00:00,  1.32s/it]
 2025-05-06 16:15:25,185 - INFO - 
 === Retrieval Performance Summary ===
 2025-05-06 16:15:25,185 - INFO - Database Size: 70.74 MB (13807 documents)
