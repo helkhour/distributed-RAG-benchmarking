@@ -7,6 +7,7 @@ from evaluation import evaluate_retrieval_performance
 from embedding_utils import EmbeddingGenerator
 from config import MODEL_CONFIGS, VERBOSE, limit, K, numCandidates
 from system_evaluation import SystemEvaluator
+import gc
 
 def run_study(model_name, embedding_size):
     logger = logging.getLogger(__name__)
@@ -18,35 +19,50 @@ def run_study(model_name, embedding_size):
     
     evaluator = SystemEvaluator()
     results = {}
+    collection = None
+    dataset_raw = None
+    dataset = None
     logger.info("Running batch embedding mode")
     embedding_generator = EmbeddingGenerator(model_name, embedding_size, quantize=False)
-    
-    evaluator.start_monitoring()
-    collection, dataset_raw, data_timings, data_stats = load_and_store_data(
-        limit=limit, embedding_generator=embedding_generator, embedding_size=embedding_size
-    )
-    data_duration, data_cpu_delta = evaluator.end_monitoring("Data Load (batch)")
 
-    # Ensure dataset is a list of dictionaries
-    dataset = [dict(item) for item in dataset_raw]
+    try:
+        evaluator.start_monitoring()
+        collection, dataset_raw, data_timings, data_stats = load_and_store_data(
+            limit=limit, embedding_generator=embedding_generator, embedding_size=embedding_size
+        )
+        data_duration, data_cpu_delta = evaluator.end_monitoring("Data Load (batch)")
 
-    logger.info(f"\nRunning evaluation (top-{K}, numCandidates={numCandidates}, batch)...")
-    evaluator.start_monitoring()
-    metrics_k = evaluate_retrieval_performance(
-        dataset, collection, embedding_generator, num_candidates=numCandidates
-    )
-    eval_duration_k, eval_cpu_delta_k = evaluator.end_monitoring(f"Evaluation (top-{K}, batch)")
-    
-    if metrics_k["avg_precision"] == 0:
-        logger.warning(f"Zero precision detected for {model_name} (batch). Check embedding dimensions and vector index.")
-    
-    results["batch"] = {
-        "data_timings": data_timings,
-        "data_stats": data_stats,
-        "metrics_k": metrics_k,
-        "eval_duration_k": eval_duration_k
-    }
-    
+        # Ensure dataset is a list of dictionaries
+        dataset = [dict(item) for item in dataset_raw]
+
+        logger.info(f"\nRunning evaluation (top-{K}, numCandidates={numCandidates}, batch)...")
+        evaluator.start_monitoring()
+        metrics_k = evaluate_retrieval_performance(
+            dataset, collection, embedding_generator, num_candidates=numCandidates
+        )
+        eval_duration_k, eval_cpu_delta_k = evaluator.end_monitoring(f"Evaluation (top-{K}, batch)")
+
+        if metrics_k["avg_precision"] == 0:
+            logger.warning(f"Zero precision detected for {model_name} (batch). Check embedding dimensions and vector index.")
+
+        results["batch"] = {
+            "data_timings": data_timings,
+            "data_stats": data_stats,
+            "metrics_k": metrics_k,
+            "eval_duration_k": eval_duration_k
+        }
+    finally:
+        logger.info("Cleaning up resources...")
+        try:
+            if collection is not None:
+                collection.database.client.close()
+        except Exception as e:
+            logger.warning(f"Failed to close Mongo client: {e}")
+        # Explicitly delete large objects
+        del dataset_raw, dataset, embedding_generator
+        torch.cuda.empty_cache()
+        gc.collect()
+
     return results
 
 def summarize_results(model_name, results):
