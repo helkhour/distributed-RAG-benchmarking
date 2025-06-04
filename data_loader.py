@@ -1,4 +1,4 @@
-from datasets import load_dataset
+from datasets import load_dataset, disable_progress_bars
 from config import (
     DATASET_NAME,
     SUBSET_NAME,
@@ -13,6 +13,9 @@ from tqdm import tqdm
 import numpy as np
 import logging
 import time
+
+# Disable progress bars from the `datasets` library to keep logs clean
+disable_progress_bars()
 
 def compute_doc_stats(dataset, is_corpus=False):
     """Compute document count and size in MB for a dataset or corpus."""
