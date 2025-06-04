@@ -80,7 +80,7 @@ def load_and_store_data(limit=None, embedding_generator=None, embedding_size=Non
     logger.warning(f"Loading KILT queries: {DATASET_NAME} with subset: {SUBSET_NAME}")
     # The KILT test split includes the ground-truth provenance so it can be used
     # for evaluation similarly to the train split.
-    hotpotqa_dataset = load_dataset(DATASET_NAME, name=SUBSET_NAME, split="test")
+    hotpotqa_dataset = load_dataset(DATASET_NAME, name=SUBSET_NAME, split="train")
     if limit:
         hotpotqa_dataset = hotpotqa_dataset.select(range(min(limit, len(hotpotqa_dataset))))
     logger.debug(f"HotpotQA dataset loaded, size={len(hotpotqa_dataset)}")
