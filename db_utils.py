@@ -3,7 +3,7 @@ from pymongo.errors import ServerSelectionTimeoutError, ConnectionFailure
 import time
 import logging
 import os
-from config import DB_URI, DB_NAME, COLLECTION_NAME, VERBOSE
+from config import DB_URI, DB_NAME, COLLECTION_NAME, VERBOSE, DB_CONFIG
 
 logger = logging.getLogger(__name__)
 
@@ -47,9 +47,11 @@ def get_db_connection(max_retries=5, retry_delay=5, server_timeout_ms=60000):
             logger.error(f"Unexpected error during connection: {e}")
             raise
 
-def setup_vector_index(collection, embedding_size, timeout=300, max_interval=5):
+def setup_vector_index(collection, embedding_size, timeout=None, max_interval=5):
     """Create or update the vector index for the collection."""
     logger = logging.getLogger(__name__)
+    if timeout is None:
+        timeout = DB_CONFIG.get("index_timeout_s", 300)
     try:
         start_time = time.time()
         indexes = list(collection.list_search_indexes())

@@ -61,6 +61,8 @@ def process_query(entry, collection, embedding_generator, num_candidates):
         )
         for doc in retrieved_docs
     )
+
+    possible_relevant = len(relevant_docs)
         
     timings = {
         "query_preprocessing": embed_timings["query_preprocessing"],
@@ -76,12 +78,13 @@ def process_query(entry, collection, embedding_generator, num_candidates):
         "results": results,
         "retrieved_docs": retrieved_docs,
         "relevant_count": relevant_count,
+        "possible_relevant": possible_relevant,
         "query": query,
         "has_results": bool(results),
         "timings": timings
     }
 
-@timeout_decorator.timeout(60, timeout_exception=TimeoutError)  # 60s timeout per query
+@timeout_decorator.timeout(120, timeout_exception=TimeoutError)  # 120s timeout per query
 def evaluate_retrieval_performance(dataset, collection, embedding_generator, num_candidates=100):
     """Evaluate retrieval performance with sequential queries and timing."""
     logger = logging.getLogger(__name__)
@@ -92,6 +95,7 @@ def evaluate_retrieval_performance(dataset, collection, embedding_generator, num
     queries_with_results = 0
     total_relevant = 0
     total_retrieved = 0
+    total_possible_relevant = 0
     total_latency = 0
     query_timings = {
         "query_preprocessing": 0.0,
@@ -137,6 +141,7 @@ def evaluate_retrieval_performance(dataset, collection, embedding_generator, num
             queries_with_results += 1
         total_relevant += res["relevant_count"]
         total_retrieved += len(res["retrieved_docs"])
+        total_possible_relevant += res.get("possible_relevant", 0)
         for key in query_timings:
             if key in res["timings"]:
                 query_timings[key] += res["timings"][key]
@@ -145,8 +150,16 @@ def evaluate_retrieval_performance(dataset, collection, embedding_generator, num
 
     retrieval_success = queries_with_results / total_queries if total_queries > 0 else 0
     avg_precision = total_relevant / total_retrieved if total_retrieved > 0 else 0
+    recall = total_relevant / total_possible_relevant if total_possible_relevant > 0 else 0
+    f1 = 2 * (avg_precision * recall) / (avg_precision + recall) if (avg_precision + recall) > 0 else 0
     avg_latency = total_latency / total_queries if total_queries > 0 else 0
     throughput = total_queries / total_time if total_time > 0 else 0
+
+    # Calculate the proportion of time spent in each step
+    timing_proportions = {
+        key: (query_timings[key] / total_time) if total_time > 0 else 0
+        for key in query_timings
+    }
 
     client = MongoClient(DB_URI)
     db = client[DB_NAME]
@@ -158,20 +171,28 @@ def evaluate_retrieval_performance(dataset, collection, embedding_generator, num
     logger.info(f"Database Size: {db_size_mb:.2f} MB ({doc_count} documents)")
     logger.info(f"Retrieval Success: {retrieval_success:.2%} ({queries_with_results}/{total_queries} queries)")
     logger.info(f"Average Precision: {avg_precision:.2%} ({total_relevant}/{total_retrieved} docs)")
+    logger.info(f"Recall: {recall:.2%} ({total_relevant}/{total_possible_relevant} docs)")
+    logger.info(f"F1 Score: {f1:.2%}")
     logger.info(f"Average Latency: {avg_latency:.4f} seconds/query")
     logger.info(f"Throughput: {throughput:.2f} queries/second (sequential processing, {num_candidates} candidates)")
     logger.info(f"Total Query Preprocessing: {query_timings['query_preprocessing']:.2f}s")
     logger.info(f"Total Query Encoding: {query_timings['query_encoding']:.2f}s")
     logger.info(f"Total Vector Search: {query_timings['vector_search']:.2f}s")
+    logger.info("Timing Proportions (percent of total time):")
+    for stage, prop in timing_proportions.items():
+        logger.info(f"  {stage}: {prop:.2%}")
 
     return {
         "retrieval_success": retrieval_success,
         "avg_precision": avg_precision,
+        "recall": recall,
+        "f1": f1,
         "avg_latency": avg_latency,
         "throughput": throughput,
         "db_size_mb": db_size_mb,
         "doc_count": doc_count,
         "total_time": total_time,
         "query_timings": query_timings,
+        "timing_proportions": timing_proportions,
         "total_queries": total_queries
     }
