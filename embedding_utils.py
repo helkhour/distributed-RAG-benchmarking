@@ -2,7 +2,7 @@ import torch
 import torch.nn as nn
 from transformers import AutoTokenizer, AutoModel, BitsAndBytesConfig
 from sentence_transformers import SentenceTransformer
-from config import MODEL_CONFIGS, VERBOSE
+from config import MODEL_CONFIGS, VERBOSE, EMBED_BATCH_SIZE
 import logging
 import time
 
@@ -14,9 +14,11 @@ class EmbeddingGenerator(nn.Module):
         logger = logging.getLogger(__name__)
         self.model_name = model_name
         self.embedding_size = embedding_size
-        # self.device = "cuda"
-        self.device = "cpu"
+        self.device = "cuda" if torch.cuda.is_available() else "cpu"
         self.base_model = MODEL_CONFIGS[model_name].get("base_model", model_name)
+        self.normalize_embeddings = MODEL_CONFIGS[model_name].get(
+            "normalize_embeddings", False
+        )
         
         # if "Llama-3.1" in model_name:
         #     self.tokenizer = AutoTokenizer.from_pretrained(
@@ -99,7 +101,13 @@ class EmbeddingGenerator(nn.Module):
         else:
             # Time encoding (includes preprocessing)
             start_time = time.time()
-            embedding = self.model.encode(texts, convert_to_tensor=True, batch_size=1, show_progress_bar=False)  # Sequential processing
+            embedding = self.model.encode(
+                texts,
+                convert_to_tensor=True,
+                batch_size=EMBED_BATCH_SIZE,
+                show_progress_bar=False,
+                normalize_embeddings=self.normalize_embeddings,
+            )
             encoding_duration = time.time() - start_time
             timings["query_encoding"] = encoding_duration
             logger.debug(f"Query Encoding Duration: {encoding_duration:.4f}s")
