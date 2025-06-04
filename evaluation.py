@@ -11,24 +11,15 @@ logger = logging.getLogger(__name__)
 def process_query(entries, collection, embedding_generator, num_candidates):
     """Process a batch of queries and return metrics with timing."""
     logger.info(f"Processing batch of {len(entries)} queries.")
-    #logger.debug(f"Batch entries: {[entry['input'][:50] for entry in entries]}")
-    
     queries = [entry["input"] for entry in entries]
-    #logger.debug(f"Extracted {len(queries)} queries from batch.")
-    
+
     start_time = time.time()
     try:
-        # Generate embeddings for queries
+        # Generate embeddings
         query_embeddings_list, embed_timings = embedding_generator.generate_embedding(queries)
-        # logger.debug(f"Generated embeddings: type={type(query_embeddings_list)}, len={len(query_embeddings_list)}, sample dims={len(query_embeddings_list[0]) if query_embeddings_list else 0}")
-        # logger.debug(f"Sample embedding (first 5 dims): {query_embeddings_list[0][:5] if query_embeddings_list and query_embeddings_list[0] else 'No embeddings'}")
-        
+
         # Retrieve documents
         results, search_timings = retrieve_top_k(query_embeddings_list, collection, num_candidates)
-        # logger.debug(f"Retrieval results: type={type(results)}, len={len(results) if isinstance(results, (list, tuple)) else 'N/A'}, first item={results[0] if isinstance(results, (list, tuple)) and results else 'N/A'}")
-        if not isinstance(results, list):
-            logger.error(f"retrieve_top_k returned non-list type: {type(results)} - Value: {results}")
-            raise TypeError(f"Expected list from retrieve_top_k, got {type(results)}")
     except Exception as e:
         logger.error(f"Error processing batch of {len(queries)} queries: {str(e)}")
         return [{
@@ -36,75 +27,76 @@ def process_query(entries, collection, embedding_generator, num_candidates):
             "results": [],
             "retrieved_docs": [],
             "relevant_count": 0,
+            "possible_relevant": 0,
             "query": query,
             "has_results": False,
             "timings": {"query_preprocessing": 0, "query_encoding": 0, "vector_search": 0}
         } for query in queries]
-    
+
     latency = time.time() - start_time
     avg_latency = latency / len(queries) if queries else 0
-    # logger.debug(f"Batch processing latency: {latency:.4f}s, avg_latency={avg_latency:.4f}s")
-    
-    batch_results = []
-    for i, (query, query_embedding, result) in enumerate(zip(queries, query_embeddings_list, results)):
-        query_idx = i + 1
-        # logger.debug(f"Processing query {query_idx} in batch: {query[:50]}...")
-        # logger.debug(f"Query {query_idx} retrieved results: type={type(result)}, value={result}")
-        
-        # Extract ground-truth Wikipedia IDs/titles from provenance
-        relevant_docs = []
-        provenance = []
-        for output in entries[i]["output"]:
-            provenance.extend(output.get("provenance", []))
-        for prov in provenance:
-            if prov.get("wikipedia_id") or prov.get("title"):
-                relevant_docs.append({
-                    "wikipedia_id": prov.get("wikipedia_id", ""),
-                    "wikipedia_title": prov.get("title", "")
-                })
-    
-    # Validate retrieved documents
-    retrieved_docs = []
-    for r in results:
-        if "wikipedia_id" not in r or "wikipedia_title" not in r:
-            logger.error(f"Missing 'wikipedia_id' or 'wikipedia_title' in retrieved document: {r.keys()}")
-            continue
-        retrieved_docs.append({
-            "wikipedia_id": r["wikipedia_id"],
-            "wikipedia_title": r["wikipedia_title"]
-        })
-    
-    # Count relevant retrieved documents
-    relevant_count = sum(
-        any(
-            doc["wikipedia_id"] == ref["wikipedia_id"] or
-            doc["wikipedia_title"] == ref["wikipedia_title"]
-            for ref in relevant_docs
-        )
-        for doc in retrieved_docs
-    )
 
-    possible_relevant = len(relevant_docs)
-        
-    timings = {
-        "query_preprocessing": embed_timings["query_preprocessing"],
-        "query_encoding": embed_timings["query_encoding"],
-        "vector_search": search_timings["vector_search"]
-    }
-    
-    if VERBOSE:
-        logger.debug(f"Query: {query[:50]}... processed in {latency:.4f}s")
-    
-    return {
-        "latency": latency,
-        "results": results,
-        "retrieved_docs": retrieved_docs,
-        "relevant_count": relevant_count,
-        "possible_relevant": possible_relevant,
-        "query": query,
-        "has_results": bool(results),
-        "timings": timings
-    }
+    batch_results = []
+    for i, (query, result) in enumerate(zip(queries, results)):
+        entry = entries[i]
+
+        # Extract ground-truth provenance
+        relevant_docs = []
+        for output in entry.get("output", []):
+            for prov in output.get("provenance", []):
+                if prov.get("wikipedia_id") or prov.get("title"):
+                    relevant_docs.append({
+                        "wikipedia_id": prov.get("wikipedia_id", ""),
+                        "wikipedia_title": prov.get("title", "")
+                    })
+        possible_relevant = len(relevant_docs)
+
+        # Validate retrieved documents
+        retrieved_docs = []
+        if isinstance(result, list):
+            for doc in result:
+                if not isinstance(doc, dict):
+                    logger.error(f"Invalid doc format (not a dict): {doc}")
+                    continue
+                if "wikipedia_id" not in doc or "wikipedia_title" not in doc:
+                    logger.error(f"Missing fields in doc: {doc}")
+                    continue
+                retrieved_docs.append({
+                    "wikipedia_id": doc["wikipedia_id"],
+                    "wikipedia_title": doc["wikipedia_title"]
+                })
+        else:
+            logger.error(f"Result is not a list: {type(result)} - value: {result}")
+
+        # Count relevant retrieved docs
+        relevant_count = sum(
+            any(
+                doc["wikipedia_id"] == ref["wikipedia_id"] or
+                doc["wikipedia_title"] == ref["wikipedia_title"]
+                for ref in relevant_docs
+            )
+            for doc in retrieved_docs
+        )
+
+        timings = {
+            "query_preprocessing": embed_timings.get("query_preprocessing", 0.0),
+            "query_encoding": embed_timings.get("query_encoding", 0.0),
+            "vector_search": search_timings.get("vector_search", 0.0)
+        }
+
+        batch_results.append({
+            "latency": avg_latency,
+            "results": result,
+            "retrieved_docs": retrieved_docs,
+            "relevant_count": relevant_count,
+            "possible_relevant": possible_relevant,
+            "query": query,
+            "has_results": bool(retrieved_docs),
+            "timings": timings
+        })
+
+    return batch_results
+
 
 @timeout_decorator.timeout(120, timeout_exception=TimeoutError)  # 120s timeout per query
 def evaluate_retrieval_performance(dataset, collection, embedding_generator, num_candidates=100):

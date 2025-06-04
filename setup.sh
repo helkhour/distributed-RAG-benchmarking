@@ -33,6 +33,14 @@ echo "deb [ arch=amd64,arm64 signed-by=/usr/share/keyrings/mongodb-server-7.0.gp
 sudo apt-get update
 sudo apt-get install -y mongodb-atlas-cli
 
+#Install mongohs 
+
+
+curl -fsSL https://pgp.mongodb.com/server-6.0.asc | sudo gpg -o /usr/share/keyrings/mongodb-server-6.0.gpg --dearmor
+echo "deb [ signed-by=/usr/share/keyrings/mongodb-server-6.0.gpg ] https://repo.mongodb.org/apt/ubuntu focal/mongodb-org/6.0 multiverse" | sudo tee /etc/apt/sources.list.d/mongodb-org-6.0.list 
+sudo apt-get update
+sudo apt-get install -y mongodb-mongosh
+
 
 # Remove conflicting packages
 for pkg in docker.io docker-doc docker-compose docker-compose-v2 podman-docker containerd runc; do

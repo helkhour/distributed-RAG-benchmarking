@@ -38,3 +38,4 @@ DB_CONFIG = {
 
 # Batch size for embedding operations
 EMBED_BATCH_SIZE = 32
+BATCH_SIZE = 32

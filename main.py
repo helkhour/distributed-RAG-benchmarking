@@ -1,4 +1,5 @@
 import logging
+import torch
 from transformers.utils import logging as transformers_logging
 from sentence_transformers import SentenceTransformer
 from data_loader import load_and_store_data
@@ -9,6 +10,10 @@ from system_evaluation import SystemEvaluator
 
 def run_study(model_name, embedding_size):
     logger = logging.getLogger(__name__)
+    if torch.cuda.is_available():
+        logger.info(f"Running on GPU: {torch.cuda.get_device_name(0)} ({torch.cuda.device_count()} device(s))")
+    else:
+        logger.warning("No GPU detected! Running on CPU.")
     logger.info(f"\n=== Evaluating Model: {model_name} ===")
     
     evaluator = SystemEvaluator()
@@ -28,7 +33,7 @@ def run_study(model_name, embedding_size):
     logger.info(f"\nRunning evaluation (top-{K}, numCandidates={numCandidates}, batch)...")
     evaluator.start_monitoring()
     metrics_k = evaluate_retrieval_performance(
-        dataset, collection, embedding_generator, k=K, num_candidates=numCandidates
+        dataset, collection, embedding_generator, num_candidates=numCandidates
     )
     eval_duration_k, eval_cpu_delta_k = evaluator.end_monitoring(f"Evaluation (top-{K}, batch)")
     
@@ -101,19 +106,13 @@ def summarize_results(model_name, results):
     for key, duration in pipeline_timings.items():
         logger.info(f"{key:<30} {duration:<12.2f} {proportions[key]:<15.2f}")
     
-    logger.info(f"\nEvaluation Metrics (30 candidates):")
-    logger.info(f"  Latency (s/query): {metrics_30['avg_latency']:.4f}")
-    logger.info(f"  Throughput (q/s): {metrics_30['throughput']:.2f}")
-    logger.info(f"  Precision (%): {metrics_30['avg_precision'] * 100:.2f}")
-    logger.info(f"  Recall (%): {metrics_30['recall'] * 100:.2f}")
-    logger.info(f"  F1 Score (%): {metrics_30['f1'] * 100:.2f}")
-    logger.info(f"\nEvaluation Metrics (100 candidates):")
-    logger.info(f"  Latency (s/query): {metrics_100['avg_latency']:.4f}")
-    logger.info(f"  Throughput (q/s): {metrics_100['throughput']:.2f}")
-    logger.info(f"  Precision (%): {metrics_100['avg_precision'] * 100:.2f}")
-    logger.info(f"  Recall (%): {metrics_100['recall'] * 100:.2f}")
-    logger.info(f"  F1 Score (%): {metrics_100['f1'] * 100:.2f}")
-
+    logger.info(f"\nEvaluation Metrics ({metrics_k['total_queries']} queries):")
+    logger.info(f"  Latency (s/query): {metrics_k['avg_latency']:.4f}")
+    logger.info(f"  Throughput (q/s): {metrics_k['throughput']:.2f}")
+    logger.info(f"  Precision (%): {metrics_k['avg_precision'] * 100:.2f}")
+    logger.info(f"  Recall (%): {metrics_k['recall'] * 100:.2f}")
+    logger.info(f"  F1 Score (%): {metrics_k['f1'] * 100:.2f}")
+ 
 def main():
     transformers_logging.set_verbosity_error()
     logging.basicConfig(

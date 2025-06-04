@@ -1,4 +1,4 @@
-from datasets import load_dataset
+from datasets import load_dataset, disable_progress_bars
 from config import (
     DATASET_NAME,
     SUBSET_NAME,

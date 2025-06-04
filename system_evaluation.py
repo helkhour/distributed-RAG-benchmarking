@@ -21,7 +21,7 @@ class SystemEvaluator:
 
     def log_resources(self, prefix):
         """Log CPU percentage, cumulative CPU time, memory usage, and GPU usage."""
-        cpu_percent = self.process.cpu_percent(interval=1.0)
+        cpu_percent = self.process.cpu_percent(interval=None)
         cpu_times = self.process.cpu_times()
         cpu_time_total = cpu_times.user + cpu_times.system
         memory_mb = self.process.memory_info().rss / 1024 / 1024
@@ -41,7 +41,7 @@ class SystemEvaluator:
         cpu_time_delta = (cpu_times_end.user + cpu_times_end.system) - \
                         (self.cpu_times_start.user + self.cpu_times_start.system)
         
-        cpu_percent = self.process.cpu_percent(interval=1.0)
+        cpu_percent = self.process.cpu_percent(interval=None)
         memory_mb = self.process.memory_info().rss / 1024 / 1024
         gpu_memory = torch.cuda.memory_allocated() / 1024 / 1024 if torch.cuda.is_available() else 0
         logger.info(f"{label} - Duration: {duration:.2f}s, CPU Time Delta: {cpu_time_delta:.2f}s, "
