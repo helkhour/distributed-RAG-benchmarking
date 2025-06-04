@@ -62,64 +62,53 @@ def process_query(entries, collection, embedding_generator, num_candidates):
                     "wikipedia_id": prov.get("wikipedia_id", ""),
                     "wikipedia_title": prov.get("title", "")
                 })
-        #logger.debug(f"Query {query_idx} relevant docs: {len(relevant_docs)}")
-        
-        # Validate retrieved documents
-        retrieved_docs = []
-        if not isinstance(result, list):
-            logger.error(f"Retrieved result is not a list for query {query_idx}: type={type(result)}, value={result}")
-            result = []
-        for r in result:
-            if not isinstance(r, dict):
-                logger.error(f"Retrieved document is not a dictionary for query {query_idx}: type={type(r)}, value={r}")
-                continue
-            if "wikipedia_id" not in r or "wikipedia_title" not in r:
-                logger.error(f"Missing 'wikipedia_id' or 'wikipedia_title' in retrieved document for query {query_idx}: {r.keys()}")
-                continue
-            retrieved_docs.append({
-                "wikipedia_id": r["wikipedia_id"],
-                "wikipedia_title": r["wikipedia_title"]
-            })
-        # logger.debug(f"Query {query_idx} validated retrieved docs: {len(retrieved_docs)}")
-        
-        # Count relevant retrieved documents
-        relevant_count = sum(
-            any(
-                doc["wikipedia_id"] == ref["wikipedia_id"] or
-                doc["wikipedia_title"] == ref["wikipedia_title"]
-                for ref in relevant_docs
-            )
-            for doc in retrieved_docs
-        )
-        # logger.debug(f"Query {query_idx} relevant count: {relevant_count}")
-
-        timings = {
-            "query_preprocessing": embed_timings["query_preprocessing"] / len(queries),
-            "query_encoding": embed_timings["query_encoding"] / len(queries),
-            "vector_search": search_timings["vector_search"] / len(queries)
-        }
-        # logger.debug(f"Query {query_idx} timings: {timings}")
-        
-        # if VERBOSE:
-        #     logger.debug(f"Query: {query[:50]}... processed in {avg_latency:.4f}s")
-        #     logger.debug(f"Retrieved {len(retrieved_docs)} docs, {relevant_count} relevant")
-        
-        batch_results.append({
-            "latency": avg_latency,
-            "results": result,
-            "retrieved_docs": retrieved_docs,
-            "relevant_count": relevant_count,
-            "query": query,
-            "has_results": bool(result),
-            "timings": timings
+    
+    # Validate retrieved documents
+    retrieved_docs = []
+    for r in results:
+        if "wikipedia_id" not in r or "wikipedia_title" not in r:
+            logger.error(f"Missing 'wikipedia_id' or 'wikipedia_title' in retrieved document: {r.keys()}")
+            continue
+        retrieved_docs.append({
+            "wikipedia_id": r["wikipedia_id"],
+            "wikipedia_title": r["wikipedia_title"]
         })
+    
+    # Count relevant retrieved documents
+    relevant_count = sum(
+        any(
+            doc["wikipedia_id"] == ref["wikipedia_id"] or
+            doc["wikipedia_title"] == ref["wikipedia_title"]
+            for ref in relevant_docs
+        )
+        for doc in retrieved_docs
+    )
 
-    # logger.debug(f"Batch processing completed with {len(batch_results)} results.")
-    return batch_results
+    possible_relevant = len(relevant_docs)
+        
+    timings = {
+        "query_preprocessing": embed_timings["query_preprocessing"],
+        "query_encoding": embed_timings["query_encoding"],
+        "vector_search": search_timings["vector_search"]
+    }
+    
+    if VERBOSE:
+        logger.debug(f"Query: {query[:50]}... processed in {latency:.4f}s")
+    
+    return {
+        "latency": latency,
+        "results": results,
+        "retrieved_docs": retrieved_docs,
+        "relevant_count": relevant_count,
+        "possible_relevant": possible_relevant,
+        "query": query,
+        "has_results": bool(results),
+        "timings": timings
+    }
 
-@timeout_decorator.timeout(600, timeout_exception=TimeoutError)
-def evaluate_retrieval_performance(dataset, collection, embedding_generator, k=K, num_candidates=50):
-    """Evaluate retrieval performance with batched queries and timing."""
+@timeout_decorator.timeout(120, timeout_exception=TimeoutError)  # 120s timeout per query
+def evaluate_retrieval_performance(dataset, collection, embedding_generator, num_candidates=100):
+    """Evaluate retrieval performance with sequential queries and timing."""
     logger = logging.getLogger(__name__)
     
     total_queries = len(dataset)
@@ -129,6 +118,7 @@ def evaluate_retrieval_performance(dataset, collection, embedding_generator, k=K
     queries_with_results = 0
     total_relevant = 0
     total_retrieved = 0
+    total_possible_relevant = 0
     total_latency = 0
     query_timings = {
         "query_preprocessing": 0.0,
@@ -181,7 +171,8 @@ def evaluate_retrieval_performance(dataset, collection, embedding_generator, k=K
         if res["has_results"]:
             queries_with_results += 1
         total_relevant += res["relevant_count"]
-        total_retrieved += min(len(res["retrieved_docs"]), k)
+        total_retrieved += len(res["retrieved_docs"])
+        total_possible_relevant += res.get("possible_relevant", 0)
         for key in query_timings:
             if key in res["timings"]:
                 query_timings[key] += res["timings"][key]
@@ -190,9 +181,17 @@ def evaluate_retrieval_performance(dataset, collection, embedding_generator, k=K
     #logger.debug(f"Total evaluation time: {total_time:.2f}s")
 
     retrieval_success = queries_with_results / total_queries if total_queries > 0 else 0
-    avg_precision = total_relevant / (k * total_queries) if total_retrieved > 0 else 0
+    avg_precision = total_relevant / total_retrieved if total_retrieved > 0 else 0
+    recall = total_relevant / total_possible_relevant if total_possible_relevant > 0 else 0
+    f1 = 2 * (avg_precision * recall) / (avg_precision + recall) if (avg_precision + recall) > 0 else 0
     avg_latency = total_latency / total_queries if total_queries > 0 else 0
     throughput = total_queries / total_time if total_time > 0 else 0
+
+    # Calculate the proportion of time spent in each step
+    timing_proportions = {
+        key: (query_timings[key] / total_time) if total_time > 0 else 0
+        for key in query_timings
+    }
 
     client = MongoClient(DB_URI)
     db = client[DB_NAME]
@@ -204,12 +203,17 @@ def evaluate_retrieval_performance(dataset, collection, embedding_generator, k=K
     logger.info("\n=== Retrieval Performance Summary ===")
     logger.info(f"Collection Size: {db_size_mb:.2f} MB ({doc_count} documents)")
     logger.info(f"Retrieval Success: {retrieval_success:.2%} ({queries_with_results}/{total_queries} queries)")
-    logger.info(f"Average Precision@{k}: {avg_precision:.2%} ({total_relevant}/{k * total_queries} docs)")
+    logger.info(f"Average Precision: {avg_precision:.2%} ({total_relevant}/{total_retrieved} docs)")
+    logger.info(f"Recall: {recall:.2%} ({total_relevant}/{total_possible_relevant} docs)")
+    logger.info(f"F1 Score: {f1:.2%}")
     logger.info(f"Average Latency: {avg_latency:.4f} seconds/query")
     logger.info(f"Throughput: {throughput:.2f} queries/second")
     logger.info(f"Total Query Preprocessing: {query_timings['query_preprocessing']:.2f}s")
     logger.info(f"Total Query Encoding: {query_timings['query_encoding']:.2f}s")
     logger.info(f"Total Vector Search: {query_timings['vector_search']:.2f}s")
+    logger.info("Timing Proportions (percent of total time):")
+    for stage, prop in timing_proportions.items():
+        logger.info(f"  {stage}: {prop:.2%}")
 
     if avg_precision == 0 and VERBOSE:
         logger.info("Note: Zero precision is expected with a small corpus size (e.g., 100 documents). Consider increasing CORPUS_LIMIT for better evaluation.")
@@ -218,11 +222,14 @@ def evaluate_retrieval_performance(dataset, collection, embedding_generator, k=K
     return {
         "retrieval_success": retrieval_success,
         "avg_precision": avg_precision,
+        "recall": recall,
+        "f1": f1,
         "avg_latency": avg_latency,
         "throughput": throughput,
         "db_size_mb": db_size_mb,
         "doc_count": doc_count,
         "total_time": total_time,
         "query_timings": query_timings,
+        "timing_proportions": timing_proportions,
         "total_queries": total_queries
     }

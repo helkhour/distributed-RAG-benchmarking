@@ -89,7 +89,7 @@ def summarize_results(model_name, results):
     logger.info(f"{'KILT Corpus Size (MB)':<40} {data_stats['corpus_size_mb']:<20.2f}")
     logger.info(f"{'HotpotQA Size (MB)':<40} {data_stats['hotpotqa_size_mb']:<20.2f}")
     logger.info(f"{'Total Dataset Size (MB)':<40} {data_stats['total_size_mb']:<20.2f}")
-    logger.info(f"{'Documents Stored (Batch)':<40} {data_stats['docs_stored_batch']:<20}")
+    logger.info(f"{'Documents Stored (Batches)':<40} {data_stats['docs_stored']:<20}")
     logger.info(f"{'Database Entries':<40} {data_stats['db_entries']:<20}")
     logger.info(f"{'Database Size (MB)':<40} {metrics_k['db_size_mb']:<20.2f}")
     logger.info(f"{'Total Queries Evaluated':<40} {metrics_k['total_queries']:<20}")
@@ -101,10 +101,18 @@ def summarize_results(model_name, results):
     for key, duration in pipeline_timings.items():
         logger.info(f"{key:<30} {duration:<12.2f} {proportions[key]:<15.2f}")
     
-    logger.info(f"\nEvaluation Metrics (top-{K}, numCandidates={numCandidates}):")
-    logger.info(f"  Latency (s/query): {metrics_k['avg_latency']:.4f}")
-    logger.info(f"  Throughput (q/s): {metrics_k['throughput']:.2f}")
-    logger.info(f"  Precision@{K} (%): {metrics_k['avg_precision'] * 100:.2f}")
+    logger.info(f"\nEvaluation Metrics (30 candidates):")
+    logger.info(f"  Latency (s/query): {metrics_30['avg_latency']:.4f}")
+    logger.info(f"  Throughput (q/s): {metrics_30['throughput']:.2f}")
+    logger.info(f"  Precision (%): {metrics_30['avg_precision'] * 100:.2f}")
+    logger.info(f"  Recall (%): {metrics_30['recall'] * 100:.2f}")
+    logger.info(f"  F1 Score (%): {metrics_30['f1'] * 100:.2f}")
+    logger.info(f"\nEvaluation Metrics (100 candidates):")
+    logger.info(f"  Latency (s/query): {metrics_100['avg_latency']:.4f}")
+    logger.info(f"  Throughput (q/s): {metrics_100['throughput']:.2f}")
+    logger.info(f"  Precision (%): {metrics_100['avg_precision'] * 100:.2f}")
+    logger.info(f"  Recall (%): {metrics_100['recall'] * 100:.2f}")
+    logger.info(f"  F1 Score (%): {metrics_100['f1'] * 100:.2f}")
 
 def main():
     transformers_logging.set_verbosity_error()
@@ -135,7 +143,8 @@ def main():
     logger.debug(f"Configured models: {list(MODEL_CONFIGS.keys())}")
     models = [
         "sentence-transformers/all-MiniLM-L6-v2",
-        # "mixedbread-ai/mxbai-embed-large-v1-512"
+        "BAAI/bge-base-en-v1.5",
+        "thenlper/gte-base"
     ]
 
     for model_name in models:
