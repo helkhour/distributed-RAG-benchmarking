@@ -5,11 +5,11 @@ from sentence_transformers import SentenceTransformer
 from data_loader import load_and_store_data
 from evaluation import evaluate_retrieval_performance
 from embedding_utils import EmbeddingGenerator
-from config import MODEL_CONFIGS, VERBOSE, limit, K, numCandidates
+from config import MODEL_CONFIGS, VERBOSE, limit, K, numCandidates as DEFAULT_NUM_CANDIDATES
 from system_evaluation import SystemEvaluator
 import gc
 
-def run_study(model_name, embedding_size):
+def run_study(model_name, embedding_size, num_candidates=DEFAULT_NUM_CANDIDATES):
     logger = logging.getLogger(__name__)
     if torch.cuda.is_available():
         logger.info(f"Running on GPU: {torch.cuda.get_device_name(0)} ({torch.cuda.device_count()} device(s))")
@@ -35,10 +35,10 @@ def run_study(model_name, embedding_size):
         # Ensure dataset is a list of dictionaries
         dataset = [dict(item) for item in dataset_raw]
 
-        logger.info(f"\nRunning evaluation (top-{K}, numCandidates={numCandidates}, batch)...")
+        logger.info(f"\nRunning evaluation (top-{K}, numCandidates={num_candidates}, batch)...")
         evaluator.start_monitoring()
         metrics_k = evaluate_retrieval_performance(
-            dataset, collection, embedding_generator, num_candidates=numCandidates
+            dataset, collection, embedding_generator, num_candidates=num_candidates
         )
         eval_duration_k, eval_cpu_delta_k = evaluator.end_monitoring(f"Evaluation (top-{K}, batch)")
 
@@ -65,7 +65,7 @@ def run_study(model_name, embedding_size):
 
     return results
 
-def summarize_results(model_name, results):
+def summarize_results(model_name, results, num_candidates):
     logger = logging.getLogger(__name__)
     config = MODEL_CONFIGS[model_name]
     embedding_size = config["embedding_size"]
@@ -97,6 +97,7 @@ def summarize_results(model_name, results):
     else:
         logger.info(f"  Parameters: {parameters}")
     logger.info(f"  Embedding Size: {embedding_size}")
+    logger.info(f"  Num Candidates: {num_candidates}")
     
     logger.info(f"\nDataset and Database Statistics:")
     logger.info(f"{'Metric':<40} {'Value':<20}")
@@ -162,11 +163,18 @@ def main():
         "thenlper/gte-base"
     ]
 
-    for model_name in models:
+    for idx, model_name in enumerate(models):
         embedding_size = MODEL_CONFIGS[model_name]["embedding_size"]
         logger.debug(f"Running study for model: {model_name}, embedding_size: {embedding_size}")
-        results = run_study(model_name, embedding_size)
-        summarize_results(model_name, results)
+
+        if idx == 0:
+            for num_cand in [30, 60]:
+                logger.info(f"Running {model_name} with numCandidates={num_cand}")
+                results = run_study(model_name, embedding_size, num_candidates=num_cand)
+                summarize_results(model_name, results, num_cand)
+        else:
+            results = run_study(model_name, embedding_size, num_candidates=30)
+            summarize_results(model_name, results, 30)
 
 if __name__ == "__main__":
     main()
