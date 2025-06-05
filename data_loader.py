@@ -69,8 +69,16 @@ def load_and_store_data(limit=None, embedding_generator=None, embedding_size=Non
         
     # Load KILT corpus (documents) using streaming to avoid large memory usage
     start_time = time.time()
-    logger.warning(f"Loading KILT corpus: {CORPUS_NAME} (streaming mode)")
-    kilt_corpus = load_dataset(CORPUS_NAME, split="train", streaming=True)
+    logger.warning(f"Loading KILT corpus: {CORPUS_NAME}")
+    if CORPUS_NAME.endswith(".jsonl") or CORPUS_NAME.endswith(".json"):
+        kilt_corpus = load_dataset(
+            "json",
+            data_files=CORPUS_NAME,
+            split="train",
+            streaming=True,
+        )
+    else:
+        kilt_corpus = load_dataset(CORPUS_NAME, split="train", streaming=True)
     if CORPUS_LIMIT:
         kilt_corpus = kilt_corpus.take(CORPUS_LIMIT)
     timings["dataset_load"] = time.time() - start_time

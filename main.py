@@ -1,15 +1,20 @@
 import logging
+import os
 import torch
 from transformers.utils import logging as transformers_logging
 from sentence_transformers import SentenceTransformer
 from data_loader import load_and_store_data
 from evaluation import evaluate_retrieval_performance
 from embedding_utils import EmbeddingGenerator
-from config import MODEL_CONFIGS, VERBOSE, limit, K, numCandidates
+from config import MODEL_CONFIGS, VERBOSE, limit, K, numCandidates as DEFAULT_NUM_CANDIDATES
 from system_evaluation import SystemEvaluator
+import gc
 
-def run_study(model_name, embedding_size):
+def run_study(model_name, embedding_size, num_candidates=DEFAULT_NUM_CANDIDATES, output_file=None):
     logger = logging.getLogger(__name__)
+    if output_file is None:
+        safe_name = model_name.replace("/", "_")
+        output_file = os.getenv("OUTPUT_FILE", f"results_{safe_name}.jsonl")
     if torch.cuda.is_available():
         logger.info(f"Running on GPU: {torch.cuda.get_device_name(0)} ({torch.cuda.device_count()} device(s))")
     else:
@@ -18,38 +23,57 @@ def run_study(model_name, embedding_size):
     
     evaluator = SystemEvaluator()
     results = {}
+    collection = None
+    dataset_raw = None
+    dataset = None
     logger.info("Running batch embedding mode")
     embedding_generator = EmbeddingGenerator(model_name, embedding_size, quantize=False)
-    
-    evaluator.start_monitoring()
-    collection, dataset_raw, data_timings, data_stats = load_and_store_data(
-        limit=limit, embedding_generator=embedding_generator, embedding_size=embedding_size
-    )
-    data_duration, data_cpu_delta = evaluator.end_monitoring("Data Load (batch)")
 
-    # Ensure dataset is a list of dictionaries
-    dataset = [dict(item) for item in dataset_raw]
+    try:
+        evaluator.start_monitoring()
+        collection, dataset_raw, data_timings, data_stats = load_and_store_data(
+            limit=limit, embedding_generator=embedding_generator, embedding_size=embedding_size
+        )
+        data_duration, data_cpu_delta = evaluator.end_monitoring("Data Load (batch)")
 
-    logger.info(f"\nRunning evaluation (top-{K}, numCandidates={numCandidates}, batch)...")
-    evaluator.start_monitoring()
-    metrics_k = evaluate_retrieval_performance(
-        dataset, collection, embedding_generator, num_candidates=numCandidates
-    )
-    eval_duration_k, eval_cpu_delta_k = evaluator.end_monitoring(f"Evaluation (top-{K}, batch)")
-    
-    if metrics_k["avg_precision"] == 0:
-        logger.warning(f"Zero precision detected for {model_name} (batch). Check embedding dimensions and vector index.")
-    
-    results["batch"] = {
-        "data_timings": data_timings,
-        "data_stats": data_stats,
-        "metrics_k": metrics_k,
-        "eval_duration_k": eval_duration_k
-    }
-    
+        # Ensure dataset is a list of dictionaries
+        dataset = [dict(item) for item in dataset_raw]
+
+        logger.info(f"\nRunning evaluation (top-{K}, numCandidates={num_candidates}, batch)...")
+        evaluator.start_monitoring()
+        metrics_k = evaluate_retrieval_performance(
+            dataset,
+            collection,
+            embedding_generator,
+            num_candidates=num_candidates,
+            output_file=output_file,
+        )
+        eval_duration_k, eval_cpu_delta_k = evaluator.end_monitoring(f"Evaluation (top-{K}, batch)")
+
+        if metrics_k["avg_precision"] == 0:
+            logger.warning(f"Zero precision detected for {model_name} (batch). Check embedding dimensions and vector index.")
+
+        results["batch"] = {
+            "data_timings": data_timings,
+            "data_stats": data_stats,
+            "metrics_k": metrics_k,
+            "eval_duration_k": eval_duration_k
+        }
+    finally:
+        logger.info("Cleaning up resources...")
+        try:
+            if collection is not None:
+                collection.database.client.close()
+        except Exception as e:
+            logger.warning(f"Failed to close Mongo client: {e}")
+        # Explicitly delete large objects
+        del dataset_raw, dataset, embedding_generator
+        torch.cuda.empty_cache()
+        gc.collect()
+
     return results
 
-def summarize_results(model_name, results):
+def summarize_results(model_name, results, num_candidates):
     logger = logging.getLogger(__name__)
     config = MODEL_CONFIGS[model_name]
     embedding_size = config["embedding_size"]
@@ -81,6 +105,7 @@ def summarize_results(model_name, results):
     else:
         logger.info(f"  Parameters: {parameters}")
     logger.info(f"  Embedding Size: {embedding_size}")
+    logger.info(f"  Num Candidates: {num_candidates}")
     
     logger.info(f"\nDataset and Database Statistics:")
     logger.info(f"{'Metric':<40} {'Value':<20}")
@@ -140,17 +165,29 @@ def main():
     logger = logging.getLogger(__name__)
     logger.info("Starting RAG retrieval evaluation...")
     logger.debug(f"Configured models: {list(MODEL_CONFIGS.keys())}")
-    models = [
-        "sentence-transformers/all-MiniLM-L6-v2",
-        "BAAI/bge-base-en-v1.5",
-        "thenlper/gte-base"
-    ]
 
-    for model_name in models:
+    models_env = os.getenv("MODELS")
+    if models_env:
+        models = [m.strip() for m in models_env.split(",") if m.strip()]
+    else:
+        models = [
+            "sentence-transformers/all-MiniLM-L6-v2",
+            "BAAI/bge-base-en-v1.5",
+            "thenlper/gte-base",
+        ]
+
+    for idx, model_name in enumerate(models):
         embedding_size = MODEL_CONFIGS[model_name]["embedding_size"]
         logger.debug(f"Running study for model: {model_name}, embedding_size: {embedding_size}")
-        results = run_study(model_name, embedding_size)
-        summarize_results(model_name, results)
+
+        if idx == 0:
+            for num_cand in [30, 60]:
+                logger.info(f"Running {model_name} with numCandidates={num_cand}")
+                results = run_study(model_name, embedding_size, num_candidates=num_cand)
+                summarize_results(model_name, results, num_cand)
+        else:
+            results = run_study(model_name, embedding_size, num_candidates=30)
+            summarize_results(model_name, results, 30)
 
 if __name__ == "__main__":
     main()

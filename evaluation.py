@@ -1,4 +1,5 @@
 import time
+import json
 from pymongo import MongoClient
 from config import DB_URI, DB_NAME, VERBOSE, BATCH_SIZE, COLLECTION_NAME, K
 from retrieval import retrieve_top_k
@@ -8,8 +9,16 @@ from tqdm import tqdm
 
 logger = logging.getLogger(__name__)
 
-def process_query(entries, collection, embedding_generator, num_candidates):
-    """Process a batch of queries and return metrics with timing."""
+def process_query(entries, collection, embedding_generator, num_candidates, max_retries=3):
+    """Process a batch of queries and return metrics with timing.
+
+    Args:
+        entries: List of query dataset entries.
+        collection: MongoDB collection to search.
+        embedding_generator: Embedding model wrapper.
+        num_candidates: Number of candidates to retrieve.
+        max_retries: Number of times to retry a failed vector search.
+    """
     logger.info(f"Processing batch of {len(entries)} queries.")
     queries = [entry["input"] for entry in entries]
 
@@ -19,7 +28,9 @@ def process_query(entries, collection, embedding_generator, num_candidates):
         query_embeddings_list, embed_timings = embedding_generator.generate_embedding(queries)
 
         # Retrieve documents
-        results, search_timings = retrieve_top_k(query_embeddings_list, collection, num_candidates)
+        results, search_timings = retrieve_top_k(
+            query_embeddings_list, collection, num_candidates, retries=max_retries
+        )
     except Exception as e:
         logger.error(f"Error processing batch of {len(queries)} queries: {str(e)}")
         return [{
@@ -98,9 +109,25 @@ def process_query(entries, collection, embedding_generator, num_candidates):
     return batch_results
 
 
-@timeout_decorator.timeout(120, timeout_exception=TimeoutError)  # 120s timeout per query
-def evaluate_retrieval_performance(dataset, collection, embedding_generator, num_candidates=100):
-    """Evaluate retrieval performance with sequential queries and timing."""
+@timeout_decorator.timeout(1200, timeout_exception=TimeoutError)  # overall timeout
+def evaluate_retrieval_performance(
+    dataset,
+    collection,
+    embedding_generator,
+    num_candidates=100,
+    output_file=None,
+    max_retries=3,
+):
+    """Evaluate retrieval performance with sequential queries and timing.
+
+    Args:
+        dataset: Dataset of queries.
+        collection: MongoDB collection with the vector index.
+        embedding_generator: Embedding model wrapper.
+        num_candidates: Number of candidates per query.
+        output_file: Optional path to save incremental results in JSONL format.
+        max_retries: Retry attempts for each vector search.
+    """
     logger = logging.getLogger(__name__)
     
     total_queries = len(dataset)
@@ -122,16 +149,22 @@ def evaluate_retrieval_performance(dataset, collection, embedding_generator, num
     logger.info(f"Starting batch evaluation with {total_queries} queries, {num_candidates} candidates")
     #logger.debug(f"Evaluation parameters: k={k}, batch_size={BATCH_SIZE}")
     start_total_time = time.time()
-    
+
     start_overhead = time.time()
     results = []
+    out_f = open(output_file, "a") if output_file else None
     try:
         for i in tqdm(range(0, len(dataset), BATCH_SIZE), desc="Processing query batches", disable=not VERBOSE):
             batch = dataset[i:i + BATCH_SIZE]
             # logger.debug(f"Processing batch {i//BATCH_SIZE + 1} with {len(batch)} queries")
             try:
-                batch_results = process_query(batch, collection, embedding_generator, num_candidates)
+                batch_results = process_query(
+                    batch, collection, embedding_generator, num_candidates, max_retries
+                )
                 results.extend(batch_results)
+                if out_f:
+                    for br in batch_results:
+                        out_f.write(json.dumps(br) + "\n")
                 if (i // BATCH_SIZE + 1) % 10 == 0:
                     logger.info(f"Processed {i + len(batch)}/{total_queries} queries")
             except TimeoutError:
@@ -146,6 +179,18 @@ def evaluate_retrieval_performance(dataset, collection, embedding_generator, num
                         "has_results": False,
                         "timings": {"query_preprocessing": 0, "query_encoding": 0, "vector_search": 0}
                     })
+                if out_f:
+                    for entry in batch:
+                        out_f.write(json.dumps({
+                            "latency": 0,
+                            "results": [],
+                            "retrieved_docs": [],
+                            "relevant_count": 0,
+                            "possible_relevant": 0,
+                            "query": entry["input"],
+                            "has_results": False,
+                            "timings": {"query_preprocessing": 0, "query_encoding": 0, "vector_search": 0}
+                        }) + "\n")
             except Exception as e:
                 logger.error(f"Error in batch {i//BATCH_SIZE + 1}: {str(e)}")
                 continue
@@ -184,6 +229,9 @@ def evaluate_retrieval_performance(dataset, collection, embedding_generator, num
         key: (query_timings[key] / total_time) if total_time > 0 else 0
         for key in query_timings
     }
+
+    if out_f:
+        out_f.close()
 
     client = MongoClient(DB_URI)
     db = client[DB_NAME]

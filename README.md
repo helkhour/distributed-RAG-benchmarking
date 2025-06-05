@@ -118,3 +118,58 @@ sudo apt-get install -y mongodb-atlas-cli
 ```
 
 ---
+---
+
+### Generating a HotpotQA provenance subset
+
+For quick tests you can build a mini KILT corpus that only contains the documents referenced in the HotpotQA dataset:
+
+```bash
+python generate_hotpotqa_subset.py --output hotpotqa_subset.jsonl
+```
+
+Use this file as the corpus when embedding documents to speed up evaluation on a small scale.
+
+To use the subset in the pipeline, set `CORPUS_NAME` in `config.py` to the path
+of the generated JSONL file:
+
+```python
+CORPUS_NAME = "hotpotqa_subset.jsonl"
+```
+
+The data loader will detect the `.jsonl` extension and load the corpus from this
+file. After updating the path run the `main.py` script to embed the subset and
+evaluate retrieval performance.
+
+### Running on PubMedQA
+
+To evaluate the pipeline on the PubMedQA questions, change the dataset configuration in `config.py`:
+
+```python
+DATASET_NAME = "facebook/kilt_tasks"
+SUBSET_NAME = "pubmedqa"
+```
+
+Then run `main.py` as usual.
+
+### Running Each Model on a Separate VM
+
+To avoid GPU/CPU exhaustion when using the full corpus you can evaluate one model per machine. Set the `MODELS` environment variable to the desired model before running `main.py`:
+
+```bash
+export MODELS="BAAI/bge-base-en-v1.5"
+python main.py
+```
+
+Only the models listed in `MODELS` will be executed. Without this variable all predefined models run sequentially.
+
+### Using the Full KILT Corpus
+
+When embedding the entire Wikipedia corpus set the limits in `config.py` to `None`:
+
+```python
+CORPUS_LIMIT = None
+limit = None
+```
+
+Reducing `EMBED_BATCH_SIZE` and `BATCH_SIZE` may prevent out-of-memory errors. During evaluation the script now writes each batch's results to `results_<model>.jsonl` (or the path from `OUTPUT_FILE`) so progress is saved even if a timeout occurs.

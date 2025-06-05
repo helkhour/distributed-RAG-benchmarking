@@ -6,8 +6,15 @@ from config import BATCH_SIZE
 
 logger = logging.getLogger(__name__)
 
-def retrieve_top_k(query_embeddings, collection, num_candidates):
-    """Retrieve top-K documents from MongoDB using vector search for a batch of query embeddings."""
+def retrieve_top_k(query_embeddings, collection, num_candidates, retries=3):
+    """Retrieve top-K documents from MongoDB using vector search for a batch of query embeddings.
+
+    Args:
+        query_embeddings: List of query vectors.
+        collection: MongoDB collection with the vector index.
+        num_candidates: Number of candidate documents to retrieve.
+        retries: Number of times to retry a failed search.
+    """
     logger.info(f"Starting retrieval with num_candidates={num_candidates} for {len(query_embeddings)} queries.")
     logger.debug(f"Retrieval input: query_embeddings type={type(query_embeddings)}, len={len(query_embeddings)}, sample dims={len(query_embeddings[0]) if query_embeddings and query_embeddings[0] else 0}")
     
@@ -64,27 +71,44 @@ def retrieve_top_k(query_embeddings, collection, num_candidates):
         batch_start = time.time()
         for j, query_embedding in enumerate(batch):
             query_idx = i + j + 1
-            logger.debug(f"Processing query {query_idx} with vector (first 5 dims): type={type(query_embedding)}, value={query_embedding[:5]}")
-            try:
-                search_results = list(collection.aggregate(pipeline(query_embedding)))
-                logger.debug(f"Query {query_idx} raw search results: type={type(search_results)}, len={len(search_results)}, first item={search_results[0] if search_results else 'No results'}")
-                
-                validated_results = []
-                if not search_results:
-                    logger.warning(f"Query {query_idx} returned no results.")
-                else:
-                    for res in search_results:
-                        if not isinstance(res, dict):
-                            logger.error(f"Query {query_idx} search result is not a dictionary: type={type(res)} - value={res}")
-                            continue
-                        if "wikipedia_id" not in res or "wikipedia_title" not in res:
-                            logger.error(f"Query {query_idx} missing required fields in search result: {res.keys()}")
-                            continue
-                        validated_results.append(res)
-                batch_results.append(validated_results)
-            except Exception as e:
-                logger.error(f"Vector search failed for query {query_idx}: {str(e)}")
+            logger.debug(
+                f"Processing query {query_idx} with vector (first 5 dims): type={type(query_embedding)}, value={query_embedding[:5]}"
+            )
+            search_results = None
+            for attempt in range(retries):
+                try:
+                    search_results = list(collection.aggregate(pipeline(query_embedding)))
+                    break
+                except Exception as e:
+                    logger.error(
+                        f"Vector search failed for query {query_idx} (attempt {attempt + 1}/{retries}): {str(e)}"
+                    )
+                    time.sleep(1)
+            if search_results is None:
                 batch_results.append([])
+                continue
+
+            logger.debug(
+                f"Query {query_idx} raw search results: type={type(search_results)}, len={len(search_results)}, first item={search_results[0] if search_results else 'No results'}"
+            )
+
+            validated_results = []
+            if not search_results:
+                logger.warning(f"Query {query_idx} returned no results.")
+            else:
+                for res in search_results:
+                    if not isinstance(res, dict):
+                        logger.error(
+                            f"Query {query_idx} search result is not a dictionary: type={type(res)} - value={res}"
+                        )
+                        continue
+                    if "wikipedia_id" not in res or "wikipedia_title" not in res:
+                        logger.error(
+                            f"Query {query_idx} missing required fields in search result: {res.keys()}"
+                        )
+                        continue
+                    validated_results.append(res)
+            batch_results.append(validated_results)
         batch_search_time = time.time() - batch_start
         total_search_time += batch_search_time
         logger.debug(f"Batch {i//BATCH_SIZE + 1} retrieved {len(batch_results)} queries in {batch_search_time:.4f}s")
