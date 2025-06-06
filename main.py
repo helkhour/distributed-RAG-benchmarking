@@ -157,9 +157,7 @@ def main():
     logger.info("Starting RAG retrieval evaluation...")
     logger.debug(f"Configured models: {list(MODEL_CONFIGS.keys())}")
     models = [
-        "sentence-transformers/all-MiniLM-L6-v2",
-        "BAAI/bge-base-en-v1.5",
-        "thenlper/gte-base"
+        "meta-llama/Meta-Llama-3.1-8B"
     ]
 
     for model_name in models:

@@ -21,11 +21,17 @@ class EmbeddingGenerator(nn.Module):
         self.normalize_embeddings = MODEL_CONFIGS[model_name].get(
             "normalize_embeddings", False
         )
-        
-        self.model = SentenceTransformer(self.base_model, device=self.device)
-        self.model.eval()
-        hidden_size = self.model.get_sentence_embedding_dimension()
-        # logger.debug(f"Model loaded, hidden_size={hidden_size}")
+        self.use_last_hidden = MODEL_CONFIGS[model_name].get("use_last_hidden", False)
+
+        if self.use_last_hidden:
+            self.tokenizer = AutoTokenizer.from_pretrained(self.base_model)
+            self.model = AutoModel.from_pretrained(self.base_model, torch_dtype=torch.float16).to(self.device)
+            self.model.eval()
+            hidden_size = self.model.config.hidden_size
+        else:
+            self.model = SentenceTransformer(self.base_model, device=self.device)
+            self.model.eval()
+            hidden_size = self.model.get_sentence_embedding_dimension()
         
         if hidden_size != embedding_size:
             self.projection = nn.Linear(hidden_size, embedding_size, dtype=torch.float16).to(self.device)
@@ -46,9 +52,13 @@ class EmbeddingGenerator(nn.Module):
             texts = [texts]
             # logger.debug("Converted single string to list")
 
+        start_time = time.time()
+        if self.use_last_hidden:
+            tokens = self.tokenizer(texts, padding=True, truncation=True, return_tensors="pt").to(self.device)
+            with torch.no_grad():
+                outputs = self.model(**tokens, output_hidden_states=True)
+                embedding = outputs.last_hidden_state[:, 0, :]
         else:
-            # Time encoding (includes preprocessing)
-            start_time = time.time()
             embedding = self.model.encode(
                 texts,
                 convert_to_tensor=True,
@@ -56,21 +66,21 @@ class EmbeddingGenerator(nn.Module):
                 show_progress_bar=False,
                 normalize_embeddings=self.normalize_embeddings,
             )
-            encoding_duration = time.time() - start_time
-            timings["query_encoding"] = encoding_duration
-            logger.debug(f"Query Encoding Duration: {encoding_duration:.4f}s")
+        encoding_duration = time.time() - start_time
+        timings["query_encoding"] = encoding_duration
+        logger.debug(f"Query Encoding Duration: {encoding_duration:.4f}s")
 
-            if embedding.dim() == 1:
-                embedding = embedding.unsqueeze(0)
+        if embedding.dim() == 1:
+            embedding = embedding.unsqueeze(0)
 
-            if hasattr(self, "output_size"):
-                embedding = embedding[:, :self.output_size]
-            elif hasattr(self, "projection"):
-                if self.projection is not None:
-                    if embedding.dtype != self.projection.weight.dtype:
-                        embedding = embedding.to(dtype=self.projection.weight.dtype)
-                    embedding = self.projection(embedding)
-                
-            embeddings = embedding.cpu().tolist()
+        if hasattr(self, "output_size"):
+            embedding = embedding[:, :self.output_size]
+        elif hasattr(self, "projection"):
+            if self.projection is not None:
+                if embedding.dtype != self.projection.weight.dtype:
+                    embedding = embedding.to(dtype=self.projection.weight.dtype)
+                embedding = self.projection(embedding)
 
-            return embeddings, timings  # always return list of vectors
+        embeddings = embedding.cpu().tolist()
+
+        return embeddings, timings  # always return list of vectors
