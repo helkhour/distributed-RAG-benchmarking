@@ -75,10 +75,11 @@ class EmbeddingGenerator(nn.Module):
                 with torch.no_grad():
                     outputs = self.model(**inputs)
                 last_hidden_state = outputs.last_hidden_state
-                attention_mask = inputs["attention_mask"].unsqueeze(-1)
-                sum_embeddings = torch.sum(last_hidden_state * attention_mask, dim=1)
-                num_tokens = torch.sum(attention_mask, dim=1)
-                embeddings = sum_embeddings / num_tokens
+                attention_mask = inputs["attention_mask"]
+                # Index of last non-padded token for each sequence
+                last_token_indices = attention_mask.sum(dim=1) - 1
+                batch_indices = torch.arange(last_hidden_state.size(0), device=self.device)
+                embeddings = last_hidden_state[batch_indices, last_token_indices]
                 embeddings = self.projection(embeddings)
                 encoding_duration = time.time() - start_time
                 timings["query_encoding"] = encoding_duration
