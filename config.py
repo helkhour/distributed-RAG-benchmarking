@@ -15,6 +15,12 @@ MODEL_CONFIGS = {
         "embedding_size": 768,
         "parameters": 110_000_000,
     },
+    "meta-llama/Meta-Llama-3.1-8B": {
+        "base_model": "meta-llama/Meta-Llama-3.1-8B",
+        "embedding_size": 4096,
+        "parameters": 8_000_000_000,
+        "use_last_hidden": True,
+    },
 }
 
 DB_URI = "mongodb://localhost:32768/?directConnection=true"
